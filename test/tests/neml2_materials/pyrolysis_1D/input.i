@@ -1,7 +1,7 @@
 ############### Input ################
 # Simulation parameters
 dt = 20
-nx = 100
+nx = 10
 
 # denisty kgm-3
 rho_s = 2100
@@ -317,13 +317,5 @@ xmax = 2.0
 
 [Outputs]
     exodus = true
-    [console]
-        type = Console
-        execute_postprocessors_on = 'NONE'
-    []
-    [csv]
-        type = CSV
-        file_base = 'example/out'
-    []
     print_linear_residuals = false
 []

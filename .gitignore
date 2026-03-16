@@ -344,3 +344,9 @@ puma.yaml
 
 
 .nfs*
+
+.cache
+build
+example
+check_init
+*_cp

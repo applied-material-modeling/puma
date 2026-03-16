@@ -1,0 +1,8 @@
+[Tests]
+  [test]
+    type = 'Exodiff'
+    input = 'input.i'
+    exodiff = 'input_out.e'
+    requirement = 'Make sure output is the same.'
+  []
+[]

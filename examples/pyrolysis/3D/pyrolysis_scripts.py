@@ -11,7 +11,7 @@ from generate_random_field import generate_initial_conditions
 ###############################################################################################
 
 save_folder = "main"
-corenum = 24  # number of cores used for simulation
+corenum = 4  # number of cores used for simulation
 puma_run_file = "./../../../puma-opt"
 
 
@@ -35,7 +35,7 @@ def rho_g(T, P):
 mesh_file = "gold/SiC_core.msh"
 reference_mass = 1.0  # reference mass
 num_el = 50
-L = 0.04 #m
+L = 0.04  # m
 
 # initial conditions, assumed a binary system (binder and particle) at the begining
 mode = "mass_fraction"
@@ -111,7 +111,7 @@ intial_condition = generate_initial_conditions(
     beta_a_binder=2.0,
     beta_b_binder=5.0,
     seed_binder=4562,
-    mesh_scale = 0.01,
+    mesh_scale=0.01,
     plot_cond=True,
 )
 

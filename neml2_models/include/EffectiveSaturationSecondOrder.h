@@ -22,41 +22,38 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#include "TestModel.h"
-#include <neml2/base/Registry.h>
+#pragma once
+
+#include "neml2/models/Model.h"
 
 namespace neml2
 {
-register_NEML2_object(TestModel);
-
-OptionSet
-TestModel::expected_options()
+/**
+ * @brief Define the effective saturation.
+ */
+class EffectiveSaturationSecondOrder : public Model
 {
-  OptionSet options = Model::expected_options();
-  options.set_output("y");
-  options.set_input("x1");
-  options.set_input("x2");
-  return options;
-}
+public:
+  static OptionSet expected_options();
 
-TestModel::TestModel(const OptionSet & options)
-  : Model(options),
-    _y(declare_output_variable<Scalar>("y")),
-    _x1(declare_input_variable<Scalar>("x1")),
-    _x2(declare_input_variable<Scalar>("x2"))
-{
-}
+  EffectiveSaturationSecondOrder(const OptionSet & options);
 
-void
-TestModel::set_value(bool out, bool dout, bool /*d2out*/)
-{
-  if (out)
-    _y = _x1 + _x2;
+protected:
+  void set_value(bool out, bool dout_din, bool d2out_din2) override;
 
-  if (dout)
-  {
-    _y.d(_x1) = Scalar::full(1.0);
-    _y.d(_x2) = Scalar::full(1.0);
-  }
+  /// Residual saturation
+  const Scalar & _Sr;
+
+  /// Fluid volume fraction
+  const Variable<Scalar> & _phi;
+
+  /// Maximum allowable volume fraction
+  const Scalar & _phimax;
+
+  /// Effective saturation
+  Variable<Scalar> & _S;
+
+  /// Buffer to prevent max_fraction to be zero.
+  const Scalar & _buf;
+};
 }
-} // namespace neml2

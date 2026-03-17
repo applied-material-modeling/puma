@@ -25,8 +25,6 @@
 #include "DiffusionLimitedReactionUpdate.h"
 #include <neml2/base/Registry.h>
 
-#include <neml2/misc/assertions.h>
-
 namespace neml2
 {
 register_NEML2_object(DiffusionLimitedReactionUpdate);
@@ -80,9 +78,8 @@ DiffusionLimitedReactionUpdate::DiffusionLimitedReactionUpdate(const OptionSet &
 }
 
 void
-DiffusionLimitedReactionUpdate::set_value(bool out, bool dout_din, bool d2out_din2)
+DiffusionLimitedReactionUpdate::set_value(bool out, bool dout_din, bool /*d2out_din2*/)
 {
-  neml_assert_dbg(!d2out_din2, "Second derivatives not implemented");
 
   const Scalar Rl = _R_l ? (*_R_l)() : Scalar::full(1.0, _ri.options());
   const Scalar Rs = _R_s ? (*_R_s)() : Scalar::full(1.0, _ri.options());

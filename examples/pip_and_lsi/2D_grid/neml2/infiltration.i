@@ -147,7 +147,7 @@
         to_var = 'state/M9'
     []
     [effective_saturation]
-        type = EffectiveSaturation
+        type = EffectiveSaturationSecondOrder
         residual_saturation = 0.0
         fluid_fraction = 'forces/phif'
         max_fraction = 'state/phif_max'

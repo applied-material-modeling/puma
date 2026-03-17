@@ -22,11 +22,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#include "NucleationThicknessGrowth.h"
+#include "NucleationLimitedReaction.h"
 #include <neml2/base/Registry.h>
 
 #include <neml2/tensors/Scalar.h>
-#include <neml2/misc/assertions.h>
 #include <neml2/tensors/functions/exp.h>
 #include <neml2/tensors/functions/log.h>
 #include <neml2/tensors/functions/pow.h>
@@ -34,14 +33,14 @@
 
 namespace neml2
 {
-register_NEML2_object(NucleationThicknessGrowth);
+register_NEML2_object(NucleationLimitedReaction);
 
 OptionSet
-NucleationThicknessGrowth::expected_options()
+NucleationLimitedReaction::expected_options()
 {
   OptionSet options = Model::expected_options();
-  options.doc() = "Calculate the product thickness rate of change, assuming a semi-"
-                  "infinite liquid comes into contact with another semi-infinite solid"
+  options.doc() = "Calculate the product thickness rate of change, assuming a axis-symmetric geometry"
+                  "where the liquid in the interior comes into contact with the solid skeleton"
                   "to form the product at the interface. The rate solution is controlled"
                   "via solid nucleation from inside the liquid, following Avrami and JMAK expression.";
 
@@ -55,16 +54,11 @@ NucleationThicknessGrowth::expected_options()
   options.set("growth_constant").doc() =
       "Growth constant of the solid nucleation in the liquid phase";
 
-  options.set_parameter<TensorName<Scalar>>("closure_thickness");
-  options.set("closure_thickness").doc() =
-      "The thickness in which the product phase form a continuous layer between the solid and liquid phases";
+  options.set_input("product_volume_fraction") = VariableName{"state", "phi_P"};
+  options.set("product_volume_fraction").doc() = "Volume fraction of the product phase";
 
-  options.set_parameter<TensorName<Scalar>>("fraction_transform");
-  options.set("fraction_transform").doc() =
-      "The product phase fraction transformed at the closure time.";
-
-  options.set_input("product_thickness") = VariableName{"state", "delta_P"};
-  options.set("product_thickness").doc() = "Thickness of the product phase";
+  options.set_parameter<TensorName<Scalar>>("product_molar_volume");
+  options.set("product_molar_volume").doc() = "Molar volume of the product phase";
 
   EnumSelection order_type({"EXACT", "FIRST", "SECOND", "THIRD"}, "EXACT");
   options.set<EnumSelection>("order_type") = order_type;
@@ -77,7 +71,7 @@ NucleationThicknessGrowth::expected_options()
   return options;
 }
 
-NucleationThicknessGrowth::NucleationThicknessGrowth(const OptionSet & options)
+NucleationLimitedReaction::NucleationLimitedReaction(const OptionSet & options)
   : Model(options),
     _R_l(options.get<VariableName>("liquid_reactivity").empty()
         ? nullptr
@@ -86,87 +80,68 @@ NucleationThicknessGrowth::NucleationThicknessGrowth(const OptionSet & options)
             ? nullptr
             : &declare_input_variable<Scalar>("solid_reactivity")),
     _K(declare_parameter<Scalar>("K", "growth_constant")),
-    _hc(declare_parameter<Scalar>("hc", "closure_thickness", true)),
-    _Q(declare_parameter<Scalar>("Q", "fraction_transform")),
-    _delta_P(declare_input_variable<Scalar>("product_thickness")),
+    _phi_P(declare_input_variable<Scalar>("product_volume_fraction")),
+    _omega_P(declare_parameter<Scalar>("product_molar_volume","product_molar_volume")),
     _order_type(options.get<EnumSelection>("order_type")),
     _rate(declare_output_variable<Scalar>("reaction_rate"))
 {
 }
 
 void
-NucleationThicknessGrowth::set_value(bool out, bool dout_din, bool /*d2out_din2*/)
+NucleationLimitedReaction::set_value(bool out, bool dout_din, bool /*d2out_din2*/)
 {
 
-  const Scalar Rl = _R_l ? (*_R_l)() : Scalar::full(1.0, _delta_P.options());
-  const Scalar Rs = _R_s ? (*_R_s)() : Scalar::full(1.0, _delta_P.options());
+  const Scalar Rl = _R_l ? (*_R_l)() : Scalar::full(1.0, _phi_P.options());
+  const Scalar Rs = _R_s ? (*_R_s)() : Scalar::full(1.0, _phi_P.options());
 
-  const auto eps = machine_precision(_delta_P.scalar_type());
+  const auto eps = machine_precision(_phi_P.scalar_type());
 
   // Shared quantities
-  auto M = _hc / _Q;
-  auto x = _delta_P / M;
-  auto omhm_raw = 1.0 - x;
-  auto omhm = omhm_raw;
+  auto x_raw = 1.0 * _phi_P;
+  auto x = clamp(x_raw, eps, 1.0 - eps);
+  auto omx = 1.0 - x;
 
-  Scalar f = Scalar::full(0.0, _delta_P.options());
-  Scalar dfdx = Scalar::full(0.0, _delta_P.options());
+  Scalar f = Scalar::full(0.0, _phi_P.options());
+  Scalar dfdx = Scalar::full(0.0, _phi_P.options());
 
-  if (_order_type == "FIRST") {
-    f    = (x) / _K;
+  if (_order_type == "FIRST")
+  {
+    f    = x / _K;
     dfdx = 1.0 / _K;
   }
-  else if (_order_type == "SECOND") {
+  else if (_order_type == "SECOND")
+  {
     f    = (x + 0.5 * x * x) / _K;
     dfdx = (1.0 + x) / _K;
   }
-  else if (_order_type == "THIRD") {
-    f    = (x + 0.5 * x * x + (1.0/3.0) * pow(x,3)) / _K;
+  else if (_order_type == "THIRD")
+  {
+    f    = (x + 0.5 * x * x + (1.0 / 3.0) * pow(x, 3)) / _K;
     dfdx = (1.0 + x + x * x) / _K;
   }
-  else if (_order_type == "EXACT") {
-    omhm = clamp(omhm_raw, eps, 1.0 - eps);
-    f    = -1.0 / (_K) * log(omhm);
-    dfdx = 1.0 / (_K * omhm);
+  else if (_order_type == "EXACT")
+  {
+    f    = -1.0 / _K * log(omx);
+    dfdx = 1.0 / (_K * omx);
   }
 
-  // Shared derivatives
-  auto dfdP  = dfdx / M;                          
-  auto dfdhc = dfdx * (-_delta_P / (M * _hc));    
-
-  // Rate
-  auto rate_val = 4.0 * _K * M * pow(f, 0.75) * omhm * Rl * Rs;
+  auto rate_val = 4.0 * _K / _omega_P * pow(f, 0.75) * omx * Rl * Rs;
 
   if (out)
     _rate = rate_val;
 
   if (dout_din)
   {
-    auto dRdP = 4.0 * _K * M * Rl * Rs *
-      (0.75 * pow(f, -0.25) * dfdP * omhm - pow(f, 0.75) / M);
+    auto dRdx = 4.0 * _K / _omega_P * Rl * Rs *
+                (0.75 * pow(f, -0.25) * dfdx * omx - pow(f, 0.75));
 
-    _rate.d(_delta_P) = dRdP;
+    _rate.d(_phi_P) = dRdx;
 
     if (_R_l && _R_l->is_dependent())
       _rate.d(*_R_l) = rate_val / Rl;
 
     if (_R_s && _R_s->is_dependent())
       _rate.d(*_R_s) = rate_val / Rs;
-
-    if (const auto * const hc = nl_param("hc"))
-    {
-      auto dMdhc = M / _hc;
-      auto dxdhc = -x / _hc;
-
-      auto dgdx = 0.75 * pow(f, -0.25) * dfdx * omhm - pow(f, 0.75);
-
-      auto dhc = 4.0 * _K * Rl * Rs * (
-          dMdhc * pow(f, 0.75) * omhm   
-        + M * dgdx * dxdhc              
-      );
-
-      _rate.d(*hc) = dhc;
-    }
   }
 }
 } // namespace neml2

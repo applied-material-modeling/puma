@@ -43,7 +43,7 @@ initial_product_dummy_thickness = 1e-3
         upper_bound = ${reactivity_upbound}
     []
     [diffusion_controlled]
-        type = DiffusionLimitedReaction
+        type = DiffusionLimitedReactionUpdate
         diffusion_coefficient = '${D}'
         molar_volume = '${oP_oL}'
         product_inner_radius = 'state/ri'
@@ -155,7 +155,7 @@ initial_product_dummy_thickness = 1e-3
 
     ## Seff
     [effective_saturation_premodel]
-        type = EffectiveSaturation
+        type = EffectiveSaturationSecondOrder
         residual_saturation = 0.0
         fluid_fraction = 'forces/phif'
         max_fraction = 'state/phif_max'
@@ -189,7 +189,7 @@ initial_product_dummy_thickness = 1e-3
         upper_bound = ${reactivity_upbound}
     []
     [diffusion_controlled_new]
-        type = DiffusionLimitedReaction
+        type = DiffusionLimitedReactionUpdate
         diffusion_coefficient = '${D}'
         molar_volume = '${oP_oL}'
         product_inner_radius = 'state/ri'

@@ -356,4 +356,13 @@ output_bestfit
 plots
 plots_bestfit
 p1e*
+output_bigpore*
+output_smallpore*
+plots_bigpore*
+plots_smallpore*
+pyramid_cube
 
+typical
+check_order
+results
+results_2

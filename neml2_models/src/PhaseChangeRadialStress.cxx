@@ -26,7 +26,6 @@
 #include <neml2/base/Registry.h>
 
 #include <neml2/tensors/Scalar.h>
-#include <neml2/misc/assertions.h>
 #include <neml2/tensors/functions/pow.h>
 #include <neml2/tensors/functions/clamp.h>
 
@@ -93,9 +92,8 @@ PhaseChangeRadialStress::PhaseChangeRadialStress(const OptionSet & options)
 }
 
 void
-PhaseChangeRadialStress::set_value(bool out, bool dout_din, bool d2out_din2)
+PhaseChangeRadialStress::set_value(bool out, bool dout_din, bool /*d2out_din2*/)
 {
-  neml_assert_dbg(!d2out_din2, "Second derivatives not implemented");
 
   const auto eps = machine_precision(_phi_m.scalar_type());
 

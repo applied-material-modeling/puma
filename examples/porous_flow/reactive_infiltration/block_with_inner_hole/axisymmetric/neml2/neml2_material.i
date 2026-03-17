@@ -38,7 +38,7 @@ reactivity_upbound = 0.1
         upper_bound = ${reactivity_upbound}
     []
     [diffusion_controlled]
-        type = DiffusionLimitedReaction
+        type = DiffusionLimitedReactionUpdate
         diffusion_coefficient = '${D}'
         molar_volume = '${oP_oL}'
         product_inner_radius = 'state/ri'
@@ -162,7 +162,7 @@ reactivity_upbound = 0.1
         upper_bound = ${reactivity_upbound}
     []
     [diffusion_controlled_new]
-        type = DiffusionLimitedReaction
+        type = DiffusionLimitedReactionUpdate
         diffusion_coefficient = '${D}'
         molar_volume = '${oP_oL}'
         product_inner_radius = 'state/ri'
@@ -235,7 +235,7 @@ reactivity_upbound = 0.1
         permeability = 'state/perm'
     []
     [effective_saturation]
-        type = EffectiveSaturation
+        type = EffectiveSaturationSecondOrder
         residual_saturation = 0.00001
         fluid_fraction = 'forces/phif'
         max_fraction = 'state/phif_max'

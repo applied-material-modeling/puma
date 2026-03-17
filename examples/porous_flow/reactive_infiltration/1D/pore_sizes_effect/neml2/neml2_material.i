@@ -1,9 +1,24 @@
 initial_product_dummy_thickness = 1e-3
 
+# [Settings]
+#   additional_libraries = '/home/tranh/projects/puma/neml2_models/build/dev/libpuma_matlib.so'
+# []
+
 [Solvers]
     [newton]
         type = Newton
         verbose = false
+        linear_solver = 'lu'
+    []
+    [lu]
+        type = DenseLU
+    []
+[]
+
+[EquationSystems]
+    [eq_sys]
+        type = NonlinearSystem
+        model = 'model_residual'
     []
 []
 
@@ -37,7 +52,7 @@ initial_product_dummy_thickness = 1e-3
         upper_bound = ${reactivity_upbound}
     []
     [diffusion_controlled]
-        type = DiffusionLimitedReaction
+        type = DiffusionLimitedReactionUpdate
         diffusion_coefficient = '${D}'
         molar_volume = '${oP_oL}'
         product_inner_radius = 'state/ri'
@@ -161,7 +176,7 @@ initial_product_dummy_thickness = 1e-3
         upper_bound = ${reactivity_upbound}
     []
     [diffusion_controlled_new]
-        type = DiffusionLimitedReaction
+        type = DiffusionLimitedReactionUpdate
         diffusion_coefficient = '${D}'
         molar_volume = '${oP_oL}'
         product_inner_radius = 'state/ri'
@@ -241,7 +256,7 @@ initial_product_dummy_thickness = 1e-3
         permeability = 'state/perm'
     []
     [effective_saturation]
-        type = EffectiveSaturation
+        type = EffectiveSaturationSecondOrder
         residual_saturation = ${phif_residual}
         fluid_fraction = 'forces/phif'
         max_fraction = 'state/phif_max'

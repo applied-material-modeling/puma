@@ -22,41 +22,40 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#include "TestModel.h"
-#include <neml2/base/Registry.h>
+#pragma once
+
+#include "neml2/models/Model.h"
+#include "neml2/base/EnumSelection.h"
 
 namespace neml2
 {
-register_NEML2_object(TestModel);
-
-OptionSet
-TestModel::expected_options()
+class NucleationLimitedReaction : public Model
 {
-  OptionSet options = Model::expected_options();
-  options.set_output("y");
-  options.set_input("x1");
-  options.set_input("x2");
-  return options;
-}
+public:
+  static OptionSet expected_options();
 
-TestModel::TestModel(const OptionSet & options)
-  : Model(options),
-    _y(declare_output_variable<Scalar>("y")),
-    _x1(declare_input_variable<Scalar>("x1")),
-    _x2(declare_input_variable<Scalar>("x2"))
-{
-}
+  NucleationLimitedReaction(const OptionSet & options);
 
-void
-TestModel::set_value(bool out, bool dout, bool /*d2out*/)
-{
-  if (out)
-    _y = _x1 + _x2;
+protected:
+  void set_value(bool out, bool dout_din, bool d2out_din2) override;
 
-  if (dout)
-  {
-    _y.d(_x1) = Scalar::full(1.0);
-    _y.d(_x2) = Scalar::full(1.0);
-  }
-}
+  /// Reactivity
+  const Variable<Scalar> * _R_l;
+  const Variable<Scalar> * _R_s;
+
+  /// Characteristic nucleation growth
+  const Scalar & _K;
+
+  /// Volume fraction of the product
+  const Variable<Scalar> & _phi_P;
+
+  /// Molar volume of the product
+  const Scalar & _omega_P;
+
+  /// Select order type
+  EnumSelection _order_type;
+
+  /// Reaction rate
+  Variable<Scalar> & _rate;
+};
 } // namespace neml2

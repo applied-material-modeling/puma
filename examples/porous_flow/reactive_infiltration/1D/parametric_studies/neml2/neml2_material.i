@@ -1,10 +1,24 @@
 initial_product_dummy_thickness = 1e-3
-reactivity_upbound = 0.1
+
+# [Settings]
+#   additional_libraries = '/home/tranh/projects/puma/neml2_models/build/dev/libpuma_matlib.so'
+# []
 
 [Solvers]
     [newton]
         type = Newton
         verbose = false
+        linear_solver = 'lu'
+    []
+    [lu]
+        type = DenseLU
+    []
+[]
+
+[EquationSystems]
+    [eq_sys]
+        type = NonlinearSystem
+        model = 'model_residual'
     []
 []
 
@@ -27,15 +41,15 @@ reactivity_upbound = 0.1
         type = HermiteSmoothStep
         argument = 'forces/phif'
         value = 'state/R_L'
-        lower_bound = 0.01
-        upper_bound = '${reactivity_upbound}'
+        lower_bound = ${reactivity_lowbound}
+        upper_bound = ${reactivity_upbound}
     []
     [solid_reactivity]
         type = HermiteSmoothStep
         argument = 'state/phis'
         value = 'state/R_S'
-        lower_bound = 0.01
-        upper_bound = '${reactivity_upbound}'
+        lower_bound = ${reactivity_lowbound}
+        upper_bound = ${reactivity_upbound}
     []
     [diffusion_controlled]
         type = DiffusionLimitedReactionUpdate
@@ -45,23 +59,8 @@ reactivity_upbound = 0.1
         solid_inner_radius = 'state/ro'
         liquid_reactivity = 'state/R_L'
         solid_reactivity = 'state/R_S'
-        reaction_rate = 'state/react_diff'
+        reaction_rate = 'state/react'
         product_dummy_thickness = ${initial_product_dummy_thickness}
-    []
-    [chemistry_controlled]
-        type = ChemistryLimitedReaction
-        exponent = '${chem_p}'
-        scale = '${chem_scale}'
-        product_inner_radius = 'state/ri'
-        solid_inner_radius = 'state/ro'
-        liquid_reactivity = 'state/R_L'
-        solid_reactivity = 'state/R_S'
-        reaction_rate = 'state/react_chem'
-    []
-    [reaction_rate]
-        type = ScalarLinearCombination
-        from_var = 'state/react_diff state/react_chem'
-        to_var = 'state/react'
     []
     [substance_product]
         type = ScalarLinearCombination
@@ -118,14 +117,13 @@ reactivity_upbound = 0.1
         type = ComposedModel
         models = "residual_phip residual_phis
                 outer_radius fluid_reactivity solid_reactivity
-                  reaction_rate substance_product product_rate 
-                  substance_solid solid_rate
-                  diffusion_controlled chemistry_controlled
-                  substance_solid_old substance_product_old"
+                 substance_product product_rate 
+                  substance_solid solid_rate substance_solid_old
+                  diffusion_controlled substance_product_old"
     []
     [model_update]
         type = ImplicitUpdate
-        implicit_model = 'model_residual'
+        equation_system = 'eq_sys'
         solver = 'newton'
     []
     [model_solver]
@@ -151,15 +149,15 @@ reactivity_upbound = 0.1
         type = HermiteSmoothStep
         argument = 'forces/phif'
         value = 'state/R_L'
-        lower_bound = 0.01
-        upper_bound = '${reactivity_upbound}'
+        lower_bound = ${reactivity_lowbound}
+        upper_bound = ${reactivity_upbound}
     []
     [solid_reactivity_new]
         type = HermiteSmoothStep
         argument = 'state/phis'
         value = 'state/R_S'
-        lower_bound = 0.01
-        upper_bound = '${reactivity_upbound}'
+        lower_bound = ${reactivity_lowbound}
+        upper_bound = ${reactivity_upbound}
     []
     [diffusion_controlled_new]
         type = DiffusionLimitedReactionUpdate
@@ -169,23 +167,8 @@ reactivity_upbound = 0.1
         solid_inner_radius = 'state/ro'
         liquid_reactivity = 'state/R_L'
         solid_reactivity = 'state/R_S'
-        reaction_rate = 'state/react_diff'
+        reaction_rate = 'state/react'
         product_dummy_thickness = ${initial_product_dummy_thickness}
-    []
-    [chemistry_controlled_new]
-        type = ChemistryLimitedReaction
-        exponent = '${chem_p}'
-        scale = '${chem_scale}'
-        product_inner_radius = 'state/ri'
-        solid_inner_radius = 'state/ro'
-        liquid_reactivity = 'state/R_L'
-        solid_reactivity = 'state/R_S'
-        reaction_rate = 'state/react_chem'
-    []
-    [reaction_rate_new]
-        type = ScalarLinearCombination
-        from_var = 'state/react_diff state/react_chem'
-        to_var = 'state/react'
     []
     [alpha_rate]
         type = ScalarLinearCombination
@@ -207,16 +190,16 @@ reactivity_upbound = 0.1
     []
     [void]
         type = ScalarLinearCombination
-        from_var = 'state/phip state/phis forces/phif state/phinoreact '
+        from_var = 'state/phip state/phis forces/phif'
         to_var = 'state/poro'
-        coefficients = '-1.0 -1.0 -1.0 -1.0'
-        constant_coefficient = 1.0
+        coefficients = '-1.0 -1.0 -1.0'
+        constant_coefficient = ${om_phinoreact}
     []
     [model_M5]
         type = ComposedModel
         models = 'M5 void alpha_rate liquid_consumption_rate
-        diffusion_controlled_new chemistry_controlled_new
-        outer_radius_new reaction_rate_new fluid_reactivity_new solid_reactivity_new'
+        diffusion_controlled_new
+        outer_radius_new fluid_reactivity_new solid_reactivity_new'
     []
     # get the other material term
     [phif_max]
@@ -224,19 +207,26 @@ reactivity_upbound = 0.1
         from_var = 'state/phip state/phis'
         to_var = 'state/phif_max'
         coefficients = '-1.0 -1.0'
+        constant_coefficient = ${om_phinoreact}
+    []
+    [skeleton]
+        type = ScalarLinearCombination
+        from_var = 'state/phif_max'
+        to_var = 'state/phi_skeleton'
+        coefficients = '-1.0'
         constant_coefficient = 1.0
     []
     [permeability]
         type = PowerLawPermeability
         reference_permeability = ${kk_L}
-        reference_porosity = 0.9
+        reference_porosity = ${ref_poro}
         exponent = ${permeability_power}
         porosity = 'state/phif_max'
         permeability = 'state/perm'
     []
     [effective_saturation]
         type = EffectiveSaturationSecondOrder
-        residual_saturation = 0.00001
+        residual_saturation = ${phif_residual}
         fluid_fraction = 'forces/phif'
         max_fraction = 'state/phif_max'
         effective_saturation = 'state/Seff'
@@ -260,7 +250,53 @@ reactivity_upbound = 0.1
         effective_saturation = 'state/Seff'
         capillary_pressure = 'state/Pc'
         log_extension = true
-        transition_saturation = 0.01
+        transition_saturation = 0.1
+    []
+    [M2_functional_form_front]
+        type = HermiteSmoothStep
+        argument = 'state/Seff'
+        value = 'state/M2_form_front'
+        lower_bound = '${transition_saturation_front}'
+        upper_bound = 1.0
+    []
+    [M2_front]
+        type = ScalarLinearCombination
+        from_var = 'state/M2_form_front'
+        to_var = 'state/M2_front'
+        coefficients = '${delta_Dscale_front}'
+        constant_coefficient = '${Dmacro}'
+    []
+    [M2_functional_form_back]
+        type = SymmetricHermiteInterpolation
+        argument = 'state/Seff'
+        value = 'state/M2_form_back_flip'
+        lower_bound = '${transition_saturation_back_start}'
+        upper_bound = '${transition_saturation_back}'
+    []
+    [M2_back_flip]
+        type = ScalarLinearCombination
+        from_var = 'state/M2_form_back_flip'
+        to_var = 'state/M2_form_back'
+        coefficients = '${new_scale}'
+        #constant_coefficient = 1.0
+    []
+    [M2_back]
+        type = ScalarLinearCombination
+        from_var = 'state/M2_form_back'
+        to_var = 'state/M2_back'
+        coefficients = '${delta_Dscale_back}'
+        constant_coefficient = '${Dmacro}'
+    []
+    [M2_model]
+        type = ScalarLinearCombination
+        from_var = 'state/M2_front state/M2_back'
+        to_var = 'state/M2'
+        coefficients = '${rhof} ${rhof}'
+    []
+    [M2]
+        type = ComposedModel
+        models = 'M2_functional_form_front M2_front M2_functional_form_back
+        M2_back M2_model M2_back_flip'
     []
     [M6]
         type = ScalarLinearCombination
@@ -268,21 +304,16 @@ reactivity_upbound = 0.1
         to_var = 'state/M6'
         coefficients = '-1.0'
     []
-    [Dtotal]
-        type = ScalarLinearCombination
-        from_var = 'state/M3'
-        coefficients = '${scale_flux}'
-        to_var = 'state/Dtotal'
-    []
     [model_M346]
         type = ComposedModel
-        models = 'phif_max
-        permeability effective_saturation capillary_pressure M3 M4 M6 Dtotal'
-        additional_outputs = 'state/perm state/phif_max state/M3'
+        models = 'phif_max skeleton
+        permeability effective_saturation capillary_pressure
+        M2 M3 M4 M6'
+        additional_outputs = 'state/perm state/phif_max state/Seff'
     []
     [model]
         type = ComposedModel
         models = 'model_solver model_M5 model_M346'
-        additional_outputs = 'state/phip state/phis state/M3'
+        additional_outputs = 'state/phip state/phis'
     []
 []

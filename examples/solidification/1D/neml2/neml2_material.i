@@ -89,7 +89,7 @@
         value = 'state/H'
         lower_bound = '${Ts}'
         upper_bound = '${Tl}'
-        complement_condition = true
+        complement = true
     []
     [shift_phif]
         type = ScalarLinearCombination

@@ -3,16 +3,18 @@ from matplotlib import colors, cm
 import pandas as pd
 from pathlib import Path
 
-plot_special = False  # whether to plot the special case of porosity vs x with experimental data
+plot_special = (
+    False  # whether to plot the special case of porosity vs x with experimental data
+)
 
-out_dir = Path("output")
+out_dir = Path("example")
 plt_dir = Path("plots")
 plt_dir.mkdir(exist_ok=True)
 nstep = len(list(out_dir.glob("out_value_*.csv")))
 summary = pd.read_csv(out_dir / "out.csv")
 times = summary["time"]
 
-step = 5
+step = 1
 
 font = {"family": "arial"}
 fsize = 13
@@ -40,7 +42,7 @@ qois = [
     "permeability",
     "phi_nonliquid",
     "M2",
-    "Seff"
+    "Seff",
 ]
 
 for qoi in qois:
@@ -64,7 +66,7 @@ for qoi in qois:
 # special case
 tlist = [100, 500, 650, 760]
 ls_list = [":", "--", "-.", "-"]
-lw_list = [1,1,1,1.5]
+lw_list = [1, 1, 1, 1.5]
 
 if plot_special:
 
@@ -77,19 +79,21 @@ if plot_special:
     # use pd to load porosity_result.csv file
     porosity_result = pd.read_csv("porosity_result.csv")
     # plot the porosity_result data
-    #ax.plot(porosity_result["height"]/10, porosity_result["ratio_choice"]+0.02,  "x", 
+    # ax.plot(porosity_result["height"]/10, porosity_result["ratio_choice"]+0.02,  "x",
     #        color="black", label="Experimental data", markersize=3)
 
     qoi = "phi_SiC"
-    
+
     for j in range(len(tlist)):
         i = tlist[j]
-    #for i in range(1, int(nstep-2), step*20):
+        # for i in range(1, int(nstep-2), step*20):
         df = pd.read_csv(out_dir / "out_value_{:04d}.csv".format(i))
-        ax.plot(df["x"], df[qoi],ls=ls_list[j],lw=lw_list[j] ,color='blue') #sm.to_rgba(times.iloc[i]))
+        ax.plot(
+            df["x"], df[qoi], ls=ls_list[j], lw=lw_list[j], color="blue"
+        )  # sm.to_rgba(times.iloc[i]))
     # set a horizontal colorbar
 
-    #fig.colorbar(sm, ax=ax, label="Time [s]", orientation='horizontal')
+    # fig.colorbar(sm, ax=ax, label="Time [s]", orientation='horizontal')
 
     ax.set_xlim(0, 6)
     # ax.set_ylim(0, 0.6)
@@ -97,12 +101,9 @@ if plot_special:
     ax.set_xlabel("bar height, z (cm)")
     ax.set_ylabel("{}".format(qoi))
 
-
-
     fig.tight_layout()
-    fig.savefig(plt_dir / "{}.png".format(qoi+" special"), dpi=300)
+    fig.savefig(plt_dir / "{}.png".format(qoi + " special"), dpi=300)
 
-    
     # plot M2 vs Seff
     fig, ax = plt.subplots(figsize=figsize)
     for i in range(1, nstep, step):
@@ -116,5 +117,3 @@ if plot_special:
     fig.savefig(plt_dir / "M2_vs_Seff.png", dpi=300)
 
     plt.close(fig)
-
-

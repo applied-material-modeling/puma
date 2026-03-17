@@ -1,3 +1,5 @@
+import math
+
 from matplotlib import pyplot as plt
 from matplotlib import colors, cm
 import matplotlib.font_manager as fm
@@ -5,9 +7,13 @@ from matplotlib.ticker import AutoMinorLocator
 import pandas as pd
 from pathlib import Path
 
-plot_special = True  # whether to plot the special case of porosity vs x with experimental data
+plot_special = (
+    True  # whether to plot the special case of porosity vs x with experimental data
+)
 
-out_dir = Path("output")
+rho_Si = 2.57
+
+out_dir = Path("example")
 plt_dir = Path("plots")
 plt_dir.mkdir(exist_ok=True)
 nstep = len(list(out_dir.glob("out_value_*.csv")))
@@ -16,9 +22,7 @@ times = summary["time"]
 
 step = 1
 
-fe = fm.FontEntry(
-    fname="/home/tranh/Fonts/arial.ttf", name="Arial"
-)
+fe = fm.FontEntry(fname="/home/tranh/Fonts/arial.ttf", name="Arial")
 fm.fontManager.ttflist.insert(0, fe)
 
 font = {"family": "Arial"}
@@ -47,7 +51,7 @@ qois = [
     "permeability",
     "phi_nonliquid",
     "M2",
-    "Seff"
+    "Seff",
 ]
 
 for qoi in qois:
@@ -67,11 +71,28 @@ for qoi in qois:
     fig.savefig(plt_dir / "{}.png".format(qoi), dpi=300)
     plt.close(fig)
 
+# plot M2 vs Seff
+fig, ax = plt.subplots(figsize=figsize)
+for i in range(1, nstep, step):
+    df = pd.read_csv(out_dir / "out_value_{:04d}.csv".format(i))
+    ax.plot(df["Seff"], df["M2"] / rho_Si, color=sm.to_rgba(times.iloc[i]))
+# set a horizontal colorbar
+fig.colorbar(sm, ax=ax, label="Time [s]")
+ax.set_xlabel("Seff")
+ax.set_ylabel("Deff")
+fig.savefig(plt_dir / "Deff_vs_Seff.png", dpi=300)
+plt.close(fig)
 
 # special case
-tlist = [10, 198]
+n_tlist = 3
 ls_list = [":", "--", "-.", "-"]
-lw_list = [1,1,1,1.5]
+lw_list = [1, 1, 1, 1.5]
+
+tlist = [math.floor(k * (nstep - 1) / n_tlist) for k in range(n_tlist)]
+tlist[0] = tlist[0] + 1
+if (nstep - 1) not in tlist:
+    tlist.append(nstep - 1)
+print(f"Time steps to plot for porosity are: {tlist}")
 
 if plot_special:
 
@@ -84,19 +105,27 @@ if plot_special:
     # use pd to load porosity_result.csv file
     porosity_result = pd.read_csv("porosity_result.csv")
     # plot the porosity_result data
-    ax.plot(porosity_result["height"]/10, porosity_result["ratio_choice"]+0.02,  "x", 
-            color="black", label="Experimental data", markersize=3)
+    ax.plot(
+        porosity_result["height"] / 10,
+        porosity_result["ratio_choice"] + 0.02,
+        "x",
+        color="black",
+        label="Experimental data",
+        markersize=3,
+    )
 
     qoi = "porosity"
-    
+
     for j in range(len(tlist)):
         i = tlist[j]
-    #for i in range(1, int(nstep-2), step*20):
+        # for i in range(1, int(nstep-2), step*20):
         df = pd.read_csv(out_dir / "out_value_{:04d}.csv".format(i))
-        ax.plot(df["x"], df[qoi],ls=ls_list[j],lw=lw_list[j] ,color='blue') #sm.to_rgba(times.iloc[i]))
+        ax.plot(
+            df["x"], df[qoi], ls=ls_list[j], lw=lw_list[j], color="blue"
+        )  # sm.to_rgba(times.iloc[i]))
     # set a horizontal colorbar
 
-    #fig.colorbar(sm, ax=ax, label="Time [s]", orientation='horizontal')
+    # fig.colorbar(sm, ax=ax, label="Time [s]", orientation='horizontal')
 
     ax.set_xlim(0, 6)
     ax.minorticks_on()
@@ -108,8 +137,6 @@ if plot_special:
     ax.set_ylabel("{}".format(qoi))
 
     fig.tight_layout()
-    fig.savefig(plt_dir / "{}.png".format(qoi+" special"), dpi=300)
+    fig.savefig(plt_dir / "{}.png".format(qoi + " special"), dpi=300)
 
     plt.close(fig)
-
-

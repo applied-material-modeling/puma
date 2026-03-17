@@ -98,7 +98,7 @@
         value = 'state/H'
         lower_bound = '${Ts}'
         upper_bound = '${Tl}'
-        complement_condition = true
+        complement = true
     []
     [shift_phif]
         type = ScalarLinearCombination
@@ -214,7 +214,7 @@
         value = 'state/Hs'
         lower_bound = 0.0
         upper_bound = '${strain_Sactivate}'
-        complement_condition = true
+        complement = true
     []
     [eps_vdot]
         type = ScalarMultiplication

@@ -376,7 +376,7 @@ initial_product_dummy_thickness = 1e-3
         value = 'state/Pp_form'
         lower_bound = ${overflow_Stransition_start}
         upper_bound = ${overflow_Stransition_end}
-        complement_condition = true
+        complement = true
     []
     [Pp_premodel]
         type = ScalarMultiplication

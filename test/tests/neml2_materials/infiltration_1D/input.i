@@ -2,12 +2,12 @@
 
 # Simulation parameters
 dt = 0.5 #s
-total_time = 1800 #s
+total_time = 100 #s
 
 flux_in = 0.01 # volume fraction
 flux_out = 0.01
 t_ramp = 10
-t_out = ${fparse total_time/10}
+t_out = ${fparse total_time/2}
 
 # Molar Mass # g mol-1
 M_Si = 28.085
@@ -21,17 +21,17 @@ rho_C = 2.26
 
 # material property
 D_LP = 9.5e-6 # cm2 s-1
-l_c = 0.05 # cm
+l_c = 0.1 # cm
 h_c = 0.0076 # cm
 K_nucl_growth = 1.2e-15 # cm s-1
 reactivity_upbound = 0.05
 reactivity_lowbound = 0.005
 
-brooks_corey_threshold = 0.5e5 #dyn/cm2
+brooks_corey_threshold = 0.5e5 # 0.5e5 #dyn/cm2
 capillary_pressure_power = 10
 phi_L_residual = 0.0
 
-permeability_power = 10.0
+permeability_power = 20.0
 
 # liquid viscosity
 # liquid silicon viscosity in egs -s
@@ -45,20 +45,20 @@ k_C = 1.0
 k_SiC = 1.0
 
 # macroscopic property
-D_macro = 0.00007 #cm2 s-1
-D_macro_high = 0.0004 # cm2 s-1
-D_macro_low = 0.00007 #0.003 # cm2 s-1
+D_macro = 0.07 #cm2 s-1
+D_macro_high = 0.4 # cm2 s-1
+D_macro_low = 0.07 #0.003 # cm2 s-1
 
 transition_saturation_front = 0.75
-transition_saturation_back = 0.45
-transition_saturation_back_start = 0.65
+transition_saturation_back = 0.25
+transition_saturation_back_start = 0.45
 
 # initial condition
-phi_noreact = 0.0
+phi_noreact = 0.36
 phi0_SiC = 0.0
-phi0_C = 0.83
+phi0_C = 0.10
 
-gravity = 0.0 
+gravity = 980.665
 
 ## Calculations
 D_bar = '${fparse D_LP/(l_c)}'
@@ -76,7 +76,7 @@ chem_ratio = '${fparse k_SiC/k_C}'
 
 new_scale = '${fparse (transition_saturation_back-transition_saturation_back_start)/2}'
 
-L = 0.6
+L = 6
 n = 1000
 
 [GlobalParams]
@@ -297,12 +297,12 @@ n = 1000
   [flux_in]
     type = PiecewiseLinear
     x = '0 ${t_ramp} ${t_out} ${fparse total_time}'
-    y = '0 ${flux_in} 0 0'
+    y = '0 ${flux_in} ${flux_in} 0'
   []
   [flux_out]
     type = PiecewiseLinear
     x = '0 ${t_ramp} ${t_out} ${fparse total_time}'
-    y = '0 ${flux_out} 0 0'
+    y = '0 ${flux_out} ${flux_out} 0'
   []
 []
 
@@ -370,7 +370,7 @@ n = 1000
     iteration_window = 2
     cutback_factor = 0.5
     cutback_factor_at_failure = 0.5
-    growth_factor = 1.2
+    growth_factor = 2.0
     linear_iteration_ratio = 10000
   []
 
@@ -388,13 +388,5 @@ n = 1000
 
 [Outputs]
   exodus = true
-  [console]
-    type = Console
-    execute_postprocessors_on = NONE
-  []
-  [csv]
-    type = CSV
-    file_base = 'example/out'
-  []
   print_linear_residuals = false
 []

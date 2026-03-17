@@ -1,8 +1,8 @@
 initial_product_dummy_thickness = 1e-3
 
-# [Settings]
-#   additional_libraries = '/home/tranh/projects/puma/neml2_models/build/dev/libpuma_matlib.so'
-# []
+[Settings]
+  additional_libraries = 'neml2/puma_custom_neml2'
+[]
 
 [Solvers]
     [newton]

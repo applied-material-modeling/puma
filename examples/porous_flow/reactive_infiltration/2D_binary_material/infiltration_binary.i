@@ -39,14 +39,14 @@ k_C = 1.0
 k_SiC = 1.0
 
 # macroscopic property
-D_macro = 0.001 #cm2 s-1
+D_macro = 0.005 #cm2 s-1
 
 # initial condition
 phi0_SiC = 0.001
 phi0_C_feature = 0.5
 phi0_C_background = 0.8
 
-gravity = 0 # 980.665
+gravity = 980.665
 
 ## Calculations
 D_bar = '${fparse D_LP/(l_c^2)}'
@@ -275,8 +275,8 @@ chem_ratio = '${fparse k_SiC/k_C}'
     boundary = core_bottom
     inlet_flux = flux_in
     outlet_flux = flux_out
-    product_fraction = phiptotal
-    product_fraction_derivative = dphiptotaldphif
+    product_fraction = phip
+    product_fraction_derivative = dphipdphif
     solid_fraction = phis
     solid_fraction_derivative = dphisdphif
     variable = phif
@@ -306,7 +306,7 @@ chem_ratio = '${fparse k_SiC/k_C}'
     iteration_window = 2
     cutback_factor = 0.5
     cutback_factor_at_failure = 0.1
-    growth_factor = 1.2
+    growth_factor = 2.0
     linear_iteration_ratio = 10000
   []
 

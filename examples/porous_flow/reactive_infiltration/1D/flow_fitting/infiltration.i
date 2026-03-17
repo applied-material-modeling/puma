@@ -2,12 +2,12 @@
 
 # Simulation parameters
 dt = 0.5 #s
-total_time = 1800 #s
+total_time = 7200 #3600 #s
 
 flux_in = 0.08 # volume fraction
 flux_out = 0.08
-t_ramp = 500
-t_out = ${total_time}
+t_ramp = 200
+t_out = ${fparse total_time/3}
 
 # Molar Mass # g mol-1
 M_Si = 28.085
@@ -20,18 +20,18 @@ rho_SiC = 3.21
 rho_C = 2.26
 
 # material property
-D_LP = 1.95e-12 # cm2 s-1
-l_c = 0.01 # cm
-
-reactivity_upbound = 0.1
-reactivity_lowbound = 0.005
+D_LP = 9.5e-6 # cm2 s-1
+l_c = 0.1 # cm
+h_c = 0.0076 # cm
+K_nucl_growth = 1.2e-15 # cm s-1
+reactivity_upbound = 0.05
+reactivity_lowbound = 0.0001
 
 brooks_corey_threshold = 0.5e5 # 0.5e5 #dyn/cm2
 capillary_pressure_power = 10
 phi_L_residual = 0.0
 
-permeability_power = 8
-ref_poro = 0.9
+permeability_power = 20.0
 
 # liquid viscosity
 # liquid silicon viscosity in egs -s
@@ -45,23 +45,23 @@ k_C = 1.0
 k_SiC = 1.0
 
 # macroscopic property
-D_macro =  0.03 # 0.0002 #cm2 s-1
-D_macro_high = 0.1 # 0.01 # cm2 s-1
-D_macro_low = 0.03 # 0.003 # cm2 s-1
+D_macro = 0.0007 #cm2 s-1
+D_macro_high = 0.04 # cm2 s-1
+D_macro_low = 0.0007 #0.003 # cm2 s-1
 
 transition_saturation_front = 0.75
-transition_saturation_back = 0.45
-transition_saturation_back_start = 0.65
+transition_saturation_back = 0.25
+transition_saturation_back_start = 0.45
 
 # initial condition
-phi_noreact = 0.45
+phi_noreact = 0.36
 phi0_SiC = 0.0
-phi0_C = 0.0
+phi0_C = 0.10
 
 gravity = 980.665
 
 ## Calculations
-D_bar = '${fparse D_LP/(l_c^2)}'
+D_bar = '${fparse D_LP/(l_c)}'
 
 omega_C = '${fparse M_C/rho_C}'
 omega_Si = '${fparse M_Si/rho_Si}'
@@ -76,8 +76,8 @@ chem_ratio = '${fparse k_SiC/k_C}'
 
 new_scale = '${fparse (transition_saturation_back-transition_saturation_back_start)/2}'
 
-L = 6.5
-n = 100
+L = 6
+n = 1000
 
 [GlobalParams]
   pressure = P
@@ -220,7 +220,8 @@ n = 100
               rhof2_nu=${fparse rho_Si^2/mu_Si} phif_residual=${phi_L_residual} rhof=${fparse rho_Si}
               omega_Si=${omega_Si} D=${D_bar} oSiCm1=${oSiCm1} oCm1=${oCm1}
               chem_ratio=${chem_ratio} mchem_P=${fparse -k_SiC} oP_oL=${fparse omega_SiC/omega_Si}
-              brooks_corey_threshold=${brooks_corey_threshold} ref_poro=${ref_poro}
+              brooks_corey_threshold=${brooks_corey_threshold}
+              K_nucl_growth=${fparse K_nucl_growth/l_c} mhcolc=${fparse -h_c/l_c} omega_SiC=${omega_SiC}
               Dmacro=${D_macro} delta_Dscale_front=${fparse D_macro_high-D_macro}
               delta_Dscale_back=${fparse D_macro_low-D_macro}
               rhof = ${rho_Si} new_scale=${new_scale} transition_saturation_back=${transition_saturation_back}
@@ -295,13 +296,13 @@ n = 100
 [Functions]
   [flux_in]
     type = PiecewiseLinear
-    x = '0 ${t_ramp} ${t_out} ${fparse total_time +5}'
+    x = '0 ${t_ramp} ${t_out} ${fparse total_time}'
     y = '0 ${flux_in} ${flux_in} 0'
   []
   [flux_out]
     type = PiecewiseLinear
-    x = '0 ${t_ramp}'
-    y = '0 ${flux_out}'
+    x = '0 ${t_ramp} ${t_out} ${fparse total_time}'
+    y = '0 ${flux_out} ${flux_out} 0'
   []
 []
 
@@ -369,7 +370,7 @@ n = 100
     iteration_window = 2
     cutback_factor = 0.5
     cutback_factor_at_failure = 0.5
-    growth_factor = 5.0
+    growth_factor = 1.2
     linear_iteration_ratio = 10000
   []
 

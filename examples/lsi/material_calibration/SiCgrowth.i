@@ -37,7 +37,7 @@
         value = 'state/Hdiff'
         lower_bound = 1.0
         upper_bound = 1.1
-        complement_condition = true
+        complement = true
     []
     [switch_off_nucl]
         type = ScalarLinearCombination

@@ -1,7 +1,7 @@
 ############## Input ################
 # Simulation parameters
-dt = 20
-nx = 100
+dt = 3
+nx = 10
 
 # models
 Ts = 1687
@@ -38,8 +38,8 @@ kappa_C = 3e8
 # Heating conditions
 dTdt = -60 #Kmin-1 heating rate
 t_ramp = '${fparse (T0-Tmax)/dTdt*60}' #s
-t_hold = 7200 #s
-total_time = '${fparse t_ramp + t_hold}'
+t_hold = 1800 #s
+total_time = '${fparse t_ramp + t_hold-1200}'
 
 # boundary conditions
 htc = 20000 #g / s3-K
@@ -603,7 +603,7 @@ delta_Omega = '${fparse omega_Si_s/omega_Si_l-1}'
         iteration_window = 2
         cutback_factor = 0.2
         cutback_factor_at_failure = 0.5
-        growth_factor = 1.2
+        growth_factor = 2.0
         linear_iteration_ratio = 10000
     []
 

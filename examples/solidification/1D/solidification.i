@@ -539,7 +539,7 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
     []
     [csv]
         type = CSV
-        file_base = 'output/out'
+        file_base = 'example/out'
     []
     print_linear_residuals = false
 []

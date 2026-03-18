@@ -39,7 +39,7 @@ PhaseChangeRadialStress::expected_options()
   OptionSet options = Model::expected_options();
   options.doc() = "Closed-form radial interface stress for an axisymmetric "
                   "phase transformation with volumetric misfit.";
-
+  
   // Parameters
   options.set_parameter<TensorName<Scalar>>("E_s");
   options.set("E_s").doc() = "New Phase Young's modulus";
@@ -58,7 +58,7 @@ PhaseChangeRadialStress::expected_options()
 
   // State inputs
   options.set_input("macroscopic_strain") = VariableName{"state", "eps_t"};
-  options.set("macroscopic_strain").doc() = "Macroscopic radial strain";
+  options.set("macroscopic_strain").doc() = "Macroscopic volumetric strain measure tr(eps)/3";
 
   options.set_input("pore_pressure") = VariableName{"state", "p"};
   options.set("pore_pressure").doc() = "Pore pressure";
@@ -70,8 +70,8 @@ PhaseChangeRadialStress::expected_options()
   options.set("new_phase_volume_fraction").doc() = "New phase volume fraction";
 
   // Output
-  options.set_output("radial_stress") = VariableName{"state", "radial_stress"};
-  options.set("radial_stress").doc() = "Radial stress at the phase-solid interface";
+  options.set_output("hydrostatic_stress") = VariableName{"state", "hydrostatic_stress"};
+  options.set("hydrostatic_stress").doc() = "Hydrostatic stress stress at the phase-solid interface";
 
   return options;
 }
@@ -87,7 +87,7 @@ PhaseChangeRadialStress::PhaseChangeRadialStress(const OptionSet & options)
     _p(declare_input_variable<Scalar>("pore_pressure")),
     _phi_m(declare_input_variable<Scalar>("matrix_volume_fraction")),
     _phi_fs(declare_input_variable<Scalar>("new_phase_volume_fraction")),
-    _srr(declare_output_variable<Scalar>("radial_stress"))
+    _sh(declare_output_variable<Scalar>("hydrostatic_stress"))
 {
 }
 
@@ -189,13 +189,20 @@ PhaseChangeRadialStress::set_value(bool out, bool dout_din, bool /*d2out_din2*/)
 
   auto denom_s = (1.0 + _nus) * (1.0 - 2.0 * _nus) + eps;
 
-  auto sigma_int =
-        _Es * As / denom_s
-      - (_Es / (1.0 + _nus)) * (Bs / (b2 + eps))
-      - _Es * _dw / (3.0 * (1.0 - 2.0 * _nus) + eps);
+  // radial stress variant
+  // auto sigma_int =
+  //       _Es * As / denom_s
+  //     - (_Es / (1.0 + _nus)) * (Bs / (b2 + eps))
+  //     - _Es * _dw / (3.0 * (1.0 - 2.0 * _nus) + eps);
+
+  // if (out)
+  //   _srr = sigma_int;
+
+  auto Ks = _Es / (3.0 * ((1.0 - 2.0 * _nus) + eps));
+  auto sigma_h = Ks * (2.0 * As - _dw);
 
   if (out)
-    _srr = sigma_int;
+    _sh = sigma_h;
 
   if (dout_din)
   {
@@ -247,18 +254,25 @@ PhaseChangeRadialStress::set_value(bool out, bool dout_din, bool /*d2out_din2*/)
   
     auto dBs_dp   = cB * (dN_Bs_dp   * Q_Bs - N_Bs_num * dQ_Bs_dp)   / (Q_Bs * Q_Bs);
     auto dBs_deps = cB * (dN_Bs_deps * Q_Bs - N_Bs_num * dQ_Bs_deps) / (Q_Bs * Q_Bs);
+    
+    // sigma_rr variant
+    // auto d_sigma_dp =
+    //       _Es * dAs_dp / denom_s
+    //     - (_Es / (1.0 + _nus)) * (dBs_dp / (b2 + eps));
   
-    auto d_sigma_dp =
-          _Es * dAs_dp / denom_s
-        - (_Es / (1.0 + _nus)) * (dBs_dp / (b2 + eps));
-  
-    auto d_sigma_deps =
-          _Es * dAs_deps / denom_s
-        - (_Es / (1.0 + _nus)) * (dBs_deps / (b2 + eps));
-  
-    _srr.d(_p)     = d_sigma_dp;
-    _srr.d(_eps_t) = d_sigma_deps;
-  
+    // auto d_sigma_deps =
+    //       _Es * dAs_deps / denom_s
+    //     - (_Es / (1.0 + _nus)) * (dBs_deps / (b2 + eps));
+   
+    // _srr.d(_p)     = d_sigma_dp;
+    // _srr.d(_eps_t) = d_sigma_deps;
+    
+    auto d_sigmah_dp   = 2.0 * Ks * dAs_dp;
+    auto d_sigmah_deps = 2.0 * Ks * dAs_deps;
+
+    _sh.d(_p)     = d_sigmah_dp;
+    _sh.d(_eps_t) = d_sigmah_deps;
+
     // for other two derivatives
     auto compute_dsigma_dphi =
       [&](const Scalar & da2, const Scalar & db2) -> Scalar
@@ -307,17 +321,20 @@ PhaseChangeRadialStress::set_value(bool out, bool dout_din, bool /*d2out_din2*/)
           - (_Es / (1.0 + _nus)) *
             ( dBs / db2_eps
             - Bs * db2 / (db2_eps * db2_eps) );
-  
-      return d_sigma_dphi;
+              
+      // srr varinat return d_sigma_dphi;
+      return 2.0 * Ks * dAs;
     };
 
     auto da2_phi_m = Scalar::full(-1.0, _phi_m.options());
     auto db2_phi_m = Scalar::full(-1.0, _phi_m.options());
-    _srr.d(_phi_m) = compute_dsigma_dphi(da2_phi_m, db2_phi_m);
+    // _srr.d(_phi_m) = compute_dsigma_dphi(da2_phi_m, db2_phi_m);
+    _sh.d(_phi_m) = compute_dsigma_dphi(da2_phi_m, db2_phi_m);
   
     auto da2_phi_fs = Scalar::full(-1.0, _phi_m.options());
     auto db2_phi_fs = Scalar::full( 0.0, _phi_m.options());
-    _srr.d(_phi_fs) = compute_dsigma_dphi(da2_phi_fs, db2_phi_fs);
+    // _srr.d(_phi_fs) = compute_dsigma_dphi(da2_phi_fs, db2_phi_fs);
+    _sh.d(_phi_fs) = compute_dsigma_dphi(da2_phi_fs, db2_phi_fs);
   }
 }
 } // namespace neml2

@@ -28,30 +28,22 @@
 
 namespace neml2
 {
-class PhaseChangeRadialStress : public Model
+class PK2HydrostaticStress : public Model
 {
 public:
   static OptionSet expected_options();
 
-  PhaseChangeRadialStress(const OptionSet & options);
+  PK2HydrostaticStress(const OptionSet & options);
 
 protected:
   void set_value(bool out, bool dout_din, bool d2out_din2) override;
 
-  // Parameters
-  const Scalar & _Es;
-  const Scalar & _nus;
-  const Scalar & _Em;
-  const Scalar & _num;
-  const Scalar & _dw;
+  /// Output: phase-change PK2 stress contribution
+  Variable<R2> & _Spc;
 
-  // State variables
-  const Variable<Scalar> & _eps_t;
-  const Variable<Scalar> & _p;
-  const Variable<Scalar> & _phi_m;
-  const Variable<Scalar> & _phi_fs;
-
-  // Output: sigma_h at interface
-  Variable<Scalar> & _sh;
+  /// Inputs
+  const Variable<Scalar> & _sh;
+  const Variable<R2> & _F;
 };
+
 } // namespace neml2

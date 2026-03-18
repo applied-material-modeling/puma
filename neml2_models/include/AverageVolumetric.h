@@ -28,30 +28,26 @@
 
 namespace neml2
 {
-class PhaseChangeRadialStress : public Model
+class SR2;
+class R2;
+
+/// Determinant of a rank two tensor
+template <typename T>
+class AverageVolumetric : public Model
 {
 public:
   static OptionSet expected_options();
 
-  PhaseChangeRadialStress(const OptionSet & options);
+  AverageVolumetric(const OptionSet & options);
 
 protected:
-  void set_value(bool out, bool dout_din, bool d2out_din2) override;
+void set_value(bool out, bool dout_din, bool d2out_din2) override;
 
-  // Parameters
-  const Scalar & _Es;
-  const Scalar & _nus;
-  const Scalar & _Em;
-  const Scalar & _num;
-  const Scalar & _dw;
+// Second-order tensor
+const Variable<T> & _A;
 
-  // State variables
-  const Variable<Scalar> & _eps_t;
-  const Variable<Scalar> & _p;
-  const Variable<Scalar> & _phi_m;
-  const Variable<Scalar> & _phi_fs;
+// output average volumetric
+Variable<Scalar> & _v;
 
-  // Output: sigma_h at interface
-  Variable<Scalar> & _sh;
 };
 } // namespace neml2

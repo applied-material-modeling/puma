@@ -2,15 +2,14 @@
   additional_libraries = 'libpuma_matlib.so'
 []
 
-
 [Drivers]
   [unit]
     type = ModelUnitTest
     model = 'model'
     input_Scalar_names = 'state/phi_fs state/phi_m state/p state/eps_t'
     input_Scalar_values = '0.2 0.3 10.0 0.002'
-    output_Scalar_names = 'state/srr'
-    output_Scalar_values = '-33.6045'
+    output_Scalar_names = 'state/sh'
+    output_Scalar_values = '-113.600218'
   []
 []
 
@@ -26,6 +25,6 @@
     pore_pressure = 'state/p'
     matrix_volume_fraction = 'state/phi_m'
     new_phase_volume_fraction = 'state/phi_fs'
-    radial_stress = 'state/srr'
+    hydrostatic_stress = 'state/sh'
   []
 []

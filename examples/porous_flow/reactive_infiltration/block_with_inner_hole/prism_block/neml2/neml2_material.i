@@ -85,15 +85,15 @@ reactivity_lowbound = 0.001
     [switchoff_diff]
         type = HermiteSmoothStep
         argument = 'state/rate_transition'
-        value = 'state/Hnucl'
+        value = 'state/Hdiff'
         lower_bound = 0.0
         upper_bound = 0.1
         complement = false
     []
     [switchoff_nucl]
         type = ScalarLinearCombination
-        from_var = 'state/Hnucl'
-        to_var = 'state/Hdiff'
+        from_var = 'state/Hdiff'
+        to_var = 'state/Hnucl'
         coefficients = -1.0
         constant_coefficient = 1.0
     []
@@ -245,15 +245,15 @@ reactivity_lowbound = 0.001
     [switchoff_diff_new]
         type = HermiteSmoothStep
         argument = 'state/rate_transition'
-        value = 'state/Hnucl'
+        value = 'state/Hdiff'
         lower_bound = 0.0
         upper_bound = 0.1
         complement = false
     []
     [switchoff_nucl_new]
         type = ScalarLinearCombination
-        from_var = 'state/Hnucl'
-        to_var = 'state/Hdiff'
+        from_var = 'state/Hdiff'
+        to_var = 'state/Hnucl'
         coefficients = -1.0
         constant_coefficient = 1.0
     []

@@ -55,7 +55,7 @@ transition_saturation_back_start = 0.65
 
 # initial condition
 phi_noreact = 0.0
-phi0_SiC = 0.0
+phi0_SiC = 0.00001
 phi0_C = 0.83
 
 gravity = 0.0 
@@ -341,7 +341,7 @@ n = 1000
     start_point = '0 0 0'
     end_point = '${L} 0 0'
     num_points = ${n}
-    variable = 'phif phi_SiC phi_C phi_nonliquid porosity permeability M2 Seff'
+    variable = 'phif phi_SiC phi_C phi_nonliquid porosity permeability M2 Seff Hnucl Hdiff'
     sort_by = 'x'
     execute_on = 'INITIAL TIMESTEP_END'
   []

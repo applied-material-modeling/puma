@@ -19,7 +19,7 @@ rho_SiC = 3.21
 rho_C = 2.26
 
 # material property
-D_LP = 9.5e-6 # cm2 s-1
+D_LP = 9.5e-6 # cm s-1
 l_c = 0.1 # cm
 h_c = 0.0076 # cm
 K_nucl_growth = 1.2e-15 # cm s-1
@@ -61,7 +61,7 @@ levelset_smooth_transistion = 0.2
 apparent_density = 1.0 # 0.3225925301 g cm-3
 
 ## Calculations
-D_bar = '${fparse D_LP/(l_c^2)}'
+D_bar = '${fparse D_LP/(l_c)}'
 
 omega_C = '${fparse M_C/rho_C}'
 omega_Si = '${fparse M_Si/rho_Si}'

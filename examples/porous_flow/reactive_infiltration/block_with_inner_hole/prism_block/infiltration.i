@@ -61,7 +61,7 @@ levelset_smooth_transistion = 0.1
 apparent_density = 0.3225925301 # g cm-3
 
 ## Calculations
-D_bar = '${fparse D_LP/(l_c^2)}'
+D_bar = '${fparse D_LP/(l_c)}'
 
 omega_C = '${fparse M_C/rho_C}'
 omega_Si = '${fparse M_Si/rho_Si}'

@@ -90,8 +90,8 @@ initial_product_dummy_thickness = 1e-3
     []
     [switchoff_nucl]
         type = ScalarLinearCombination
-        from_var = 'state/Hnucl'
-        to_var = 'state/Hdiff'
+        from_var = 'state/Hdiff'
+        to_var = 'state/Hnucl'
         coefficients = -1.0
         constant_coefficient = 1.0
     []
@@ -249,8 +249,8 @@ initial_product_dummy_thickness = 1e-3
     []
     [switchoff_nucl_new]
         type = ScalarLinearCombination
-        from_var = 'state/Hnucl'
-        to_var = 'state/Hdiff'
+        from_var = 'state/Hdiff'
+        to_var = 'state/Hnucl'
         coefficients = -1.0
         constant_coefficient = 1.0
     []

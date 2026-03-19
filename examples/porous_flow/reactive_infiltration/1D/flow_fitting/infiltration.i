@@ -45,9 +45,9 @@ k_C = 1.0
 k_SiC = 1.0
 
 # macroscopic property
-D_macro = 0.0007 #cm2 s-1
-D_macro_high = 0.04 # cm2 s-1
-D_macro_low = 0.0007 #0.003 # cm2 s-1
+D_macro = 0.00014 #cm2 s-1
+D_macro_high = 0.008 # cm2 s-1
+D_macro_low = 0.00014 #0.003 # cm2 s-1
 
 transition_saturation_front = 0.75
 transition_saturation_back = 0.25
@@ -55,7 +55,7 @@ transition_saturation_back_start = 0.45
 
 # initial condition
 phi_noreact = 0.36
-phi0_SiC = 0.0
+phi0_SiC = 0.00001
 phi0_C = 0.10
 
 gravity = 980.665

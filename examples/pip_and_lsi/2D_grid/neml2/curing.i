@@ -1,7 +1,22 @@
+[Settings]
+  additional_libraries = 'neml2/puma_custom_neml2'
+[]
+
 [Solvers]
     [newton]
         type = Newton
         verbose = false
+        linear_solver = 'lu'
+    []
+    [lu]
+        type = DenseLU
+    []
+[]
+
+[EquationSystems]
+    [eq_sys]
+        type = NonlinearSystem
+        model = 'reaction'
     []
 []
 
@@ -31,7 +46,7 @@
     []
     [solve_reaction]
         type = ImplicitUpdate
-        implicit_model = 'reaction'
+        equation_system = 'eq_sys'
         solver = 'newton'
     []
     [binder_rate]

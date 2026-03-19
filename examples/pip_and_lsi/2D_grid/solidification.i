@@ -1,5 +1,6 @@
 omega_Si_s = '${fparse M_Si/rho_Si_s}'
 omega_Si_l = '${fparse M_Si/rho_Si}'
+delta_Omega = '${fparse omega_Si_s/omega_Si_l-1}'
 
 [GlobalParams]
   temperature = 'T'
@@ -221,33 +222,32 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
                 hf_rhof_onu=${fparse H_latent*rho_Si/mu_Si} hf_rhof2_onu=${fparse H_latent*rho_Si^2/mu_Si}
                 mhf_rhof=${fparse -H_latent*rho_Si} mphi_min=${fparse -phif_min}
                 Tref=${Tref} therm_expansion=${therm_expansion}
-                phase_strain_coef=${phase_strain_coef} strain_Sactivate=${strain_Sactivate}
-                E=${E} '
+                E=${E} E_fs=${E_Si} E_m=${E_C} nu_fs=${nu_Si} nu_m=${nu_C} delta_Omega=${delta_Omega}'
 
   [all]
     model = 'model'
     verbose = true
     device = 'cpu'
 
-    moose_input_types = 'POSTPROCESSOR POSTPROCESSOR MATERIAL         MATERIAL
+    moose_input_types = 'POSTPROCESSOR POSTPROCESSOR MATERIAL
                          VARIABLE      VARIABLE      MATERIAL'
-    moose_inputs = '     time          time          eps_f            deformation_gradient
+    moose_inputs = '     time          time          deformation_gradient
                          phif          T             phif_s'
-    neml2_inputs = '     forces/t      old_forces/t  old_state/eps_f  forces/F
+    neml2_inputs = '     forces/t      old_forces/t  forces/F
                          forces/phif   forces/T      old_state/phif_s'
 
     moose_output_types = 'MATERIAL      MATERIAL       MATERIAL    MATERIAL    MATERIAL
                           MATERIAL      MATERIAL       MATERIAL    MATERIAL    MATERIAL
                           MATERIAL      MATERIAL       MATERIAL    MATERIAL    MATERIAL
-                          MATERIAL      MATERIAL       MATERIAL    MATERIAL'
+                          MATERIAL      MATERIAL'
     moose_outputs = '     M1            M3             M4          M5          M6
                           M7            M8             M9          M10         M11
                           phif_s        phif_max       perm        pk1_stress  nonliquid
-                          eps_f         Jf             Jt          pk2_stress'
+                          Jt            pk2_stress'
     neml2_outputs = '     state/M1      state/M3       state/M4    state/M5    state/M6
                           state/M7      state/M8       state/M9    state/M10   state/M11
                           state/phif_s  state/phif_max state/perm  state/pk1   state/nonliquid
-                          state/eps_f   state/Jf       state/Jt    state/pk2'
+                          state/Jt      state/pk2'
 
     moose_parameter_types = 'MATERIAL   MATERIAL   MATERIAL MATERIAL'
     moose_parameters = '     phis       phip       V        o_Vref'
@@ -287,8 +287,8 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
                                   state/M11 forces/T; state/M11 forces/phif; state/M11 forces/F;
                                   state/pk1 forces/T; state/pk1 forces/phif; state/pk1 forces/F'
 
-    initialize_outputs = '      eps_f             phif_s'
-    initialize_output_values = 'fluid_eigenstrain solidified_fluid'
+    initialize_outputs = '      phif_s'
+    initialize_output_values = 'solidified_fluid'
   []
 []
 
@@ -300,8 +300,8 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
   []
   [parameters]
     type = GenericConstantMaterial
-    prop_names = 'solidified_fluid fluid_eigenstrain'
-    prop_values = '0.0              0.0'
+    prop_names = 'solidified_fluid'
+    prop_values = '0.0            '
   []
   [init_mat]
     type = GenericConstantMaterial
@@ -355,19 +355,19 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
     variable = T
     value = -1
   []
-  # [open_BC]
-  #  type = InfiltrationWake
-  #  boundary = 'left right top bottom'
-  #  inlet_flux = 0.0
-  #  outlet_flux = flux_out
-  #  product_fraction = nonliquid
-  #  product_fraction_derivative = dnonliquiddphif
-  #  solid_fraction = 0
-  #  solid_fraction_derivative = 0
-  #  variable = phif
-  #  sharpness = 100
-  #  no_flux_fraction_transition = 0.001
-  #[]
+  [open_BC]
+    type = InfiltrationWake
+    boundary = 'left right top bottom'
+    inlet_flux = 0.0
+    outlet_flux = flux_out
+    product_fraction = nonliquid
+    product_fraction_derivative = dnonliquiddphif
+    solid_fraction = 0
+    solid_fraction_derivative = 0
+    variable = phif
+    sharpness = 100
+    no_flux_fraction_transition = 0.001
+  []
 []
 
 [Executioner]

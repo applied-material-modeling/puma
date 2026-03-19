@@ -1,3 +1,7 @@
+[Settings]
+    additional_libraries = 'neml2/puma_custom_neml2'
+[]
+
 [Models]
     ## solid mechanics ----------------------------------------------------------
     [Jacobian]
@@ -105,7 +109,7 @@
     []
     [advective_stress]
         type = ComposedModel
-        models = 'model_pk1 stress_scale stress_induce_pressure'
+        models = 'stress_scale stress_induce_pressure'
     []
     #################################################################
     ## porous flow -----------------------------------------------------------------
@@ -191,5 +195,6 @@
     [model]
         type = ComposedModel
         models = 'model_sm model_porousflow'
+        additional_outputs = 'state/pk1'
     []
 []

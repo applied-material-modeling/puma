@@ -1,3 +1,7 @@
+[Settings]
+  additional_libraries = 'neml2/puma_custom_neml2'
+[]
+
 [Models]
     ## Shared models among different sub-models
     [Jacobian]
@@ -176,31 +180,6 @@
         CTE = '${therm_expansion}'
         jacobian = 'state/Jt'
     []
-    [activation_strain]
-        type = HermiteSmoothStep
-        argument = 'forces/T'
-        value = 'state/Hs'
-        lower_bound = '${strain_Sactivate}'
-        upper_bound = 1.0
-    []
-    [eps_vdot]
-        type = ScalarMultiplication
-        from_var = 'forces/phif state/Hs state/phif_s_rate'
-        to_var = 'state/eps_vdot'
-        coefficient = '${phase_strain_coef}'
-    []
-    [eps_f]
-        type = ScalarForwardEulerTimeIntegration
-        variable = 'state/eps_f'
-        rate = 'state/eps_vdot'
-    []
-    [Jf]
-        type = ScalarLinearCombination
-        from_var = 'state/eps_f'
-        to_var = 'state/Jf'
-        coefficients = '1.0'
-        constant_coefficient = 1.0
-    []
     [V]
         type = ScalarParameterToState
         from = 1.0
@@ -215,14 +194,13 @@
     []
     [Jtotal_premodel]
         type = ScalarMultiplication
-        from_var = 'state/Jt state/Jf state/Jv'
+        from_var = 'state/Jt state/Jv'
         to_var = 'state/Jtotal'
     []
     [Jtotal]
         type = ComposedModel
-        models = 'Jtotal_premodel Jt Jf
-        V Jv activation_strain eps_vdot eps_f phif_s_rate'
-        additional_outputs = 'state/eps_f state/Jf state/Jt'
+        models = 'Jtotal_premodel Jt V Jv'
+        additional_outputs = 'state/Jt'
     []
 
     ## stress-strain
@@ -237,18 +215,62 @@
         deformation_gradient = 'state/Fe'
         strain = 'state/Ee'
     []
-    [S_pk2]
+
+    ## elastic stress
+    [S_pk2_e]
         type = LinearIsotropicElasticity
         strain = 'state/Ee'
-        stress = 'state/pk2_SR2'
+        stress = 'state/pk2_e_SR2'
         coefficients = '${E} 0.3'
         coefficient_types = 'YOUNGS_MODULUS POISSONS_RATIO'
     []
-    [S_pk2_R2]
+    [S_pk2_e_R2]
         type = SR2toR2
-        input = 'state/pk2_SR2'
-        output = 'state/pk2'
+        input = 'state/pk2_e_SR2'
+        output = 'state/pk2_e'
     []
+    ## hydrostatic RVE stress
+    [ee_vol]
+        type = SR2AverageVolumetric
+        input = 'state/Ee'
+        average_volumetric = 'state/Ee_ave_vol'
+    []
+    [zero_parameter]
+        type = ScalarParameterToState
+        from = 0.0
+        to = 'state/zero'
+    []
+    [phisp]
+        type = ScalarLinearCombination
+        from_var = 'state/phis state/phip'
+        to_var = 'state/phi_sp'
+        coefficients = '1.0 1.0'
+    []
+    [rve_sh]
+        type = PhaseChangeRadialStress
+        E_s = '${E_fs}'
+        nu_s = '${nu_fs}'
+        E_m = '${E_m}'
+        nu_m = '${nu_m}'
+        delta_Omega = '${delta_Omega}'
+        macroscopic_strain = 'state/Ee_ave_vol'
+        pore_pressure = 'state/zero'
+        matrix_volume_fraction = 'state/phi_sp'
+        new_phase_volume_fraction = 'state/phif_s'
+        hydrostatic_stress = 'state/rve_sh'
+    []
+    [S_pk2_h]
+        type = PK2HydrostaticStress
+        hydrostatic_stress = 'state/rve_sh'
+        deformation_gradient = 'forces/F'
+        pk2_stress = 'state/pk2_sh'
+    []
+    [S_pk2]
+        type = R2LinearCombination
+        from_var = 'state/pk2_e state/pk2_sh'
+        to_var = 'state/pk2'
+    []
+    ##
     [S_pk1]
         type = R2Multiplication
         A = 'forces/F'
@@ -258,7 +280,9 @@
     []
     [model_sm]
         type = ComposedModel
-        models = 'Jtotal totalF green_strain S_pk2 S_pk2_R2 S_pk1'
+        models = 'Jtotal totalF green_strain phisp S_pk2_e S_pk2_e_R2
+                    ee_vol zero_parameter rve_sh S_pk2_h
+                    S_pk2 S_pk1'
         additional_outputs = 'state/pk2'
     []
 

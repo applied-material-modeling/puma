@@ -51,7 +51,7 @@ save_folder = "main"
 corenum = 8  # number of cores used for simulation
 puma_run_file = "./../../../puma-opt"
 
-run_pip = True  # run the PIP simulation
+run_pip = False  # run the PIP simulation
 
 # rate of close pore relative to volume of produced gas
 def cp_to_wg_relation(volume_binder, relation=0.001):
@@ -152,12 +152,12 @@ transition_saturation_back = 0.45
 transition_saturation_back_start = 0.65
 
 # reactive infiltration properties
-D_LP = 1.95e-12 # cm2 s-1
+D_LP = 9.5e-6 # cm2 s-1
 l_c = 0.1 # cm
+h_c = 0.0076  # cm
+K_nucl_growth = 1.2e-15  # cm s-1
 k_C = 1.0
 k_SiC = 1.0
-chem_p = 250
-chem_scale = 700
 reactivity_upbound = 0.1
 reactivity_lowbound = 0.001
 
@@ -175,8 +175,10 @@ solidification_rate = 0.002
 #### stress-strain ####
 E = 400e9
 nu = 0.3
-phase_strain_coef = 1e-5 # strain coefficient for the phase eigenstrain
-strain_Sactivate = 0.8 # strain at which the phase eigenstrain starts to activate
+E_Si = 160e9
+E_C = 400e9 
+nu_Si = 0.3
+nu_C = 0.3
 
 # thermal expansion coefficients (degree-1)
 Tref = 300  # K
@@ -256,6 +258,7 @@ print("\n")
 # ------------------------------ EXECUTION ------------------------------
 if run_pip:
     # ---------------- Pyrolysis cycle 1 ----------------
+
     popen_or_fail(
         "Pyrolysis (cycle 1)",
         [
@@ -468,77 +471,76 @@ if run_pip:
         )
 
 # ---------------- LSI: Reactive Infiltration ----------------
-popen_or_fail(
-    "LSI Infiltration",
-    [
-        "mpiexec",
-        "-n",
-        str(corenum),
-        puma_run_file,
-        "-i",
-        "infiltration_lsi.i",
-        "initial_condition_from_exodus_4.i",
-        "mesh_input.i",
-        "dt={:.18f}".format(dt),
-        "total_time={:.18f}".format(t_ramp_lsi + tinfiltrate),
-        "flux_in={:.18f}".format(flux_in_lsi),
-        "flux_out={:.18f}".format(flux_out_lsi),
-        "t_ramp={:.18f}".format(t_ramp_lsi),
-        "t_heat={:.18f}".format(theat_lsi),
-        "dTdt={:.18f}".format(dTdt_lsi),
-        "brooks_corey_threshold={:.18f}".format(brooks_corey_threshold),
-        "capillary_pressure_power={:.18f}".format(capillary_pressure_power),
-        "phi_L_residual={:.18f}".format(phi_L_residual),
-        "permeability_power={:.18f}".format(permeability_power),
-        "mu_Si={:.18f}".format(mu_Si),
-        "perm_ref={:.18f}".format(perm_ref),
-        "hf={:.18f}".format(1),
-        "kappa_Si={:.18f}".format(kappa_Si),
-        "kappa_SiC={:.18f}".format(kappa_SiC),
-        "kappa_C={:.18f}".format(kappa_C),
-        "D_macro={:.18f}".format(D_macro_lsi),
-        "D_macro_high={:.18f}".format(D_macro_high),
-        "D_macro_low={:.18f}".format(D_macro_low),
-        "transition_saturation_front={:.18f}".format(transition_saturation_front),
-        "transition_saturation_back={:.18f}".format(transition_saturation_back),
-        "transition_saturation_back_start={:.18f}".format(transition_saturation_back_start),
-        "chem_p={:.18f}".format(chem_p),
-        "chem_scale={:.18f}".format(chem_scale),
-        "reactivity_upbound={:.18f}".format(reactivity_upbound),
-        "reactivity_lowbound={:.18f}".format(reactivity_lowbound),
-        "htc={:.18f}".format(htc),
-        "phif_min={:.18f}".format(phif_min),
-        "phase_strain_coef={:.18f}".format(phase_strain_coef),
-        "strain_Sactivate={:.18f}".format(strain_Sactivate),
-        "E={:.18f}".format(E),
-        "nu={:.18f}".format(nu),
-        "therm_expansion={:.18f}".format(g),
-        "T0={:.18f}".format(T0),
-        "gravity={:.18f}".format(gravity),
-        "D_LP={:.18f}".format(D_LP),
-        "l_c={:.18f}".format(l_c),
-        "M_Si={:.18f}".format(M_Si),
-        "M_SiC={:.18f}".format(M_SiC),
-        "M_C={:.18f}".format(M_C),
-        "rho_Si={:.18f}".format(rho_Si),
-        "rho_SiC={:.18f}".format(rho_SiC),
-        "rho_C={:.18f}".format(rho_C),
-        "cp_Si={:.18f}".format(cp_Si),
-        "cp_SiC={:.18f}".format(cp_SiC),
-        "cp_C={:.18f}".format(cp_C),
-        "k_C={:.18f}".format(k_C),
-        "k_SiC={:.18f}".format(k_SiC),
-        "num_el_x={}".format(num_el_x),
-        "num_el_y={}".format(num_el_y),
-        "L={:.18f}".format(L),
-        "save_folder={}".format(save_folder),
-        "load_cycle={}".format(str(pip_cycle_n - 1)),
-        "save_cycle={}".format(str(pip_cycle_n)),
-        "save_type={}".format("lsi_infiltration"),
-        "load_type={}".format("pyrolysis"),
-    ],
-    log_path="logs/lsi_infiltration_cycle{}.log".format(pip_cycle_n),
-)
+# popen_or_fail(
+#     "LSI Infiltration",
+#     [
+#         "mpiexec",
+#         "-n",
+#         str(corenum),
+#         puma_run_file,
+#         "-i",
+#         "infiltration_lsi.i",
+#         "initial_condition_from_exodus_4.i",
+#         "mesh_input.i",
+#         "dt={:.18f}".format(dt),
+#         "total_time={:.18f}".format(t_ramp_lsi + tinfiltrate),
+#         "flux_in={:.18f}".format(flux_in_lsi),
+#         "flux_out={:.18f}".format(flux_out_lsi),
+#         "t_ramp={:.18f}".format(t_ramp_lsi),
+#         "t_heat={:.18f}".format(theat_lsi),
+#         "dTdt={:.18f}".format(dTdt_lsi),
+#         "brooks_corey_threshold={:.18f}".format(brooks_corey_threshold),
+#         "capillary_pressure_power={:.18f}".format(capillary_pressure_power),
+#         "phi_L_residual={:.18f}".format(phi_L_residual),
+#         "permeability_power={:.18f}".format(permeability_power),
+#         "mu_Si={:.18f}".format(mu_Si),
+#         "perm_ref={:.18f}".format(perm_ref),
+#         "hf={:.18f}".format(1),
+#         "kappa_Si={:.18f}".format(kappa_Si),
+#         "kappa_SiC={:.18f}".format(kappa_SiC),
+#         "kappa_C={:.18f}".format(kappa_C),
+#         "D_macro={:.18f}".format(D_macro_lsi),
+#         "D_macro_high={:.18f}".format(D_macro_high),
+#         "D_macro_low={:.18f}".format(D_macro_low),
+#         "transition_saturation_front={:.18f}".format(transition_saturation_front),
+#         "transition_saturation_back={:.18f}".format(transition_saturation_back),
+#         "transition_saturation_back_start={:.18f}".format(transition_saturation_back_start),
+#         "reactivity_upbound={:.18f}".format(reactivity_upbound),
+#         "reactivity_lowbound={:.18f}".format(reactivity_lowbound),
+#         "K_nucl_growth={:.18f}".format(K_nucl_growth),
+#         "h_c={:.18f}".format(h_c),
+#         "htc={:.18f}".format(htc),
+#         "phif_min={:.18f}".format(phif_min),
+#         "E={:.18f}".format(E),
+#         "nu={:.18f}".format(nu),
+#         "therm_expansion={:.18f}".format(g),
+#         "T0={:.18f}".format(T0),
+#         "gravity={:.18f}".format(gravity),
+#         "D_LP={:.18f}".format(D_LP),
+#         "l_c={:.18f}".format(l_c),
+#         "M_Si={:.18f}".format(M_Si),
+#         "M_SiC={:.18f}".format(M_SiC),
+#         "M_C={:.18f}".format(M_C),
+#         "rho_Si={:.18f}".format(rho_Si),
+#         "rho_SiC={:.18f}".format(rho_SiC),
+#         "rho_C={:.18f}".format(rho_C),
+#         "cp_Si={:.18f}".format(cp_Si),
+#         "cp_SiC={:.18f}".format(cp_SiC),
+#         "cp_C={:.18f}".format(cp_C),
+#         "k_C={:.18f}".format(k_C),
+#         "k_SiC={:.18f}".format(k_SiC),
+#         "num_el_x={}".format(num_el_x),
+#         "num_el_y={}".format(num_el_y),
+#         "L={:.18f}".format(L),
+#         "save_folder={}".format(save_folder),
+#         "load_cycle={}".format(str(pip_cycle_n - 1)),
+#         "save_cycle={}".format(str(pip_cycle_n)),
+#         "save_type={}".format("lsi_infiltration"),
+#         "load_type={}".format("pyrolysis"),
+#     ],
+#     log_path="logs/lsi_infiltration_cycle{}.log".format(pip_cycle_n),
+# )
+
 
 # ---------------- LSI: Solidification ----------------
 popen_or_fail(
@@ -575,14 +577,16 @@ popen_or_fail(
         "H_latent={:.18f}".format(H_latent),
         "M_Si={:.18f}".format(M_Si),
         "phif_min={:.18f}".format(phif_min),
-        "phase_strain_coef={:.18f}".format(phase_strain_coef),
-        "strain_Sactivate={:.18f}".format(strain_Sactivate),
         "solidification_rate={:.18f}".format(solidification_rate),
         "gravity={:.18f}".format(gravity),
         "rho_Si={:.18f}".format(rho_Si),
         "rho_Si_s={:.18f}".format(rho_Si_s),
         "rho_SiC={:.18f}".format(rho_SiC),
         "rho_C={:.18f}".format(rho_C),
+        "E_Si={:.18f}".format(E_Si),
+        "E_C={:.18f}".format(E_C),
+        "nu_Si={:.18f}".format(nu_Si),
+        "nu_C={:.18f}".format(nu_C),
         "cp_Si={:.18f}".format(cp_Si),
         "cp_Si_s={:.18f}".format(cp_Si_s),
         "cp_SiC={:.18f}".format(cp_SiC),

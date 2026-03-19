@@ -1,6 +1,6 @@
 
 ## Calculations
-D_bar = '${fparse D_LP/(l_c^2)}'
+D_bar = '${fparse D_LP/(l_c)}'
 
 omega_C = '${fparse M_C/rho_C}'
 omega_Si = '${fparse M_Si/rho_Si}'
@@ -114,7 +114,7 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
     type = MomentumBalanceCoupledJacobian
     component = 0
     variable = disp_x
-    material_fluid_fraction_derivative = dpk1dphif
+    material_fluid_fraction_derivative = zeroR2
     material_pressure_derivative = zeroR2
     material_temperature_derivative = dpk1dT
   []
@@ -122,7 +122,7 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
     type = MomentumBalanceCoupledJacobian
     component = 1
     variable = disp_y
-    material_fluid_fraction_derivative = dpk1dphif
+    material_fluid_fraction_derivative = zeroR2
     material_pressure_derivative = zeroR2
     material_temperature_derivative = dpk1dT
   []
@@ -130,7 +130,7 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
     type = MomentumBalanceCoupledJacobian
     component = 2
     variable = disp_z
-    material_fluid_fraction_derivative = dpk1dphif
+    material_fluid_fraction_derivative = zeroR2
     material_pressure_derivative = zeroR2
     material_temperature_derivative = dpk1dT
   []
@@ -183,12 +183,12 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
               rhof2_nu=${fparse rho_Si^2/mu_Si} phif_residual=${phi_L_residual} rho_f=${rho_Si}
               brooks_corey_threshold=${brooks_corey_threshold} capillary_pressure_power=${capillary_pressure_power}
               nu=${nu} hf_rhof_nu=${fparse hf*rho_Si/mu_Si}
-              chem_scale=${fparse chem_scale/omega_Si} chem_p=${chem_p} oP_oL=${fparse omega_SiC/omega_Si}
               hf_rhof2_nu=${fparse hf*rho_Si^2/mu_Si} therm_expansion=${therm_expansion} Tref=${T0}
               omega_Si=${omega_Si} D=${D_bar} oSiCm1=${oSiCm1} oCm1=${oCm1}
               chem_ratio=${chem_ratio} mchem_P=${fparse -k_SiC}
               rhocp_Si=${fparse rho_Si*cp_Si} rhocp_SiC=${fparse rho_SiC*cp_SiC} rhocp_C=${fparse rho_C*cp_C}
-              E=${E} Dmacro=${D_macro} strain_Sactivate=${strain_Sactivate} phase_strain_coef=${phase_strain_coef}
+              E=${E} Dmacro=${D_macro}
+              K_nucl_growth=${fparse K_nucl_growth*l_c} mhcolc=${fparse -h_c/l_c} omega_SiC=${omega_SiC}
               kap_C=${kappa_C} kap_SiC=${kappa_SiC} kap_Si=${kappa_Si}
               new_scale=${new_scale} transition_saturation_back=${transition_saturation_back}
               transition_saturation_back_start=${transition_saturation_back_start}
@@ -203,24 +203,24 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
     device = 'cpu'
 
     moose_input_types = 'POSTPROCESSOR POSTPROCESSOR  VARIABLE    VARIABLE       MATERIAL
-                         MATERIAL      MATERIAL       MATERIAL    MATERIAL       MATERIAL'
+                         MATERIAL      MATERIAL       MATERIAL    MATERIAL       '
     moose_inputs = '     time          time           phif        T              deformation_gradient
-                         phip          phip           phis        phis           eps_f'
+                         phip          phip           phis        phis           '
     neml2_inputs = '     forces/t      old_forces/t   forces/phif forces/T       forces/F
-                         state/phip    old_state/phip state/phis  old_state/phis old_state/eps_f'
+                         state/phip    old_state/phip state/phis  old_state/phis '
 
     moose_parameter_types = 'MATERIAL MATERIAL MATERIAL'
     moose_parameters = '     o_Vref   V        phi0SiC_noreact'
     neml2_parameters = '     Jv_c_0   V_param  phinoreact_param'
 
     moose_output_types = 'MATERIAL       MATERIAL    MATERIAL       MATERIAL        MATERIAL    MATERIAL
-                          MATERIAL       MATERIAL    MATERIAL       MATERIAL        MATERIAL
+                          MATERIAL       MATERIAL    MATERIAL       MATERIAL
                           MATERIAL       MATERIAL    MATERIAL       MATERIAL'
     moose_outputs = '     pk1_stress     M1          M7             M3              M4          M6
-                          M2             eps_f       phis           phip            pk2_stress
+                          M2             phis        phip           pk2_stress
                           M5             M8          non_liquid     phiptotal'
     neml2_outputs = '     state/pk1      state/M1    state/M7       state/M3        state/M4    state/M6
-                          state/M2       state/eps_f state/phis     state/phip      state/pk2
+                          state/M2       state/phis  state/phip     state/pk2
                           state/M5       state/M8    state/phif_max state/phiptotal'
 
     moose_derivative_types = '                                                MATERIAL
@@ -231,7 +231,7 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
                                                       MATERIAL
                                                       MATERIAL                MATERIAL
                                                       MATERIAL
-                                  MATERIAL            MATERIAL                MATERIAL
+                                  MATERIAL            MATERIAL
                                                       MATERIAL                MATERIAL'
     moose_derivatives = '                                                     dM1dF
                                                       dM2dphif
@@ -241,7 +241,7 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
                                                       dM6dphif
                                                       dM7dphif                dM7dF
                                                       dM8dphif
-                                  dpk1dT              dpk1dphif               pk1_jacobian
+                                  dpk1dT              pk1_jacobian
                                                       dphisdphif              dphiptotaldphif'
     neml2_derivatives = '                                                     state/M1 forces/F;
                                                       state/M2  forces/phif;
@@ -251,11 +251,11 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
                                                       state/M6  forces/phif;
                                                       state/M7  forces/phif;  state/M7 forces/F;
                                                       state/M8  forces/phif;
-                                  state/pk1 forces/T; state/pk1 forces/phif;  state/pk1 forces/F;
+                                  state/pk1 forces/T; state/pk1 forces/F;
                                                       state/phis forces/phif; state/phiptotal forces/phif'
 
-    initialize_outputs = '      phip     phis   eps_f'
-    initialize_output_values = 'phi0_SiC phi0_C fluid_eigenstrain'
+    initialize_outputs = '      phip     phis   '
+    initialize_output_values = 'phi0_SiC phi0_C '
   []
 []
 
@@ -273,8 +273,8 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
   []
   [constant_material]
     type = GenericConstantMaterial
-    prop_names = 'phi0_SiC fluid_eigenstrain'
-    prop_values = '0.00001 0.0'
+    prop_names = 'phi0_SiC '
+    prop_values = '0.00001 '
   []
   [zeroR2]
     type = GenericConstantRankTwoTensor

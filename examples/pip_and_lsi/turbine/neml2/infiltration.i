@@ -1,3 +1,7 @@
+[Settings]
+    additional_libraries = 'neml2/puma_custom_neml2'
+[]
+
 [Models]
     ## solid mechanics ----------------------------------------------------------
     [Jacobian]
@@ -10,11 +14,6 @@
         coefficients = "${rho_f}"
         from_var = 'state/J'
         to_var = 'state/M1'
-    []
-    [fluid_JF]
-        type = ScalarParameterToState
-        from = 1.0
-        to = 'state/Jf'
     []
     # thermal add-on ###########
     [Fthermal]
@@ -75,9 +74,9 @@
     []
     [model_pk1]
         type = ComposedModel
-        models = 'V fluid_JF Jtotal Jvolume
+        models = 'V Jtotal Jvolume
                   Fthermal totalF green_strain S_pk2 S_pk2_R2 S_pk1'
-        additional_outputs = 'state/Jf state/Jt state/Jv state/pk2'
+        additional_outputs = 'state/Jt state/Jv state/pk2'
     []
     [model_sm]
         type = ComposedModel

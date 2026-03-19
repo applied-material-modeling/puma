@@ -46,9 +46,9 @@ def popen_or_fail(step_name, argv, log_path=None):
 ##                                                                                           ##
 ###############################################################################################
 
-pip_cycle_n = 1  # number of pip cycles
+pip_cycle_n = 2  # number of pip cycles
 save_folder = "main_highres"
-corenum = 18  # number of cores used for simulation
+corenum = 10  # number of cores used for simulation
 puma_run_file = "./../../../puma-opt"
 
 run_pip = False  # run the PIP simulation
@@ -151,12 +151,12 @@ transition_saturation_back = 0.45
 transition_saturation_back_start = 0.65
 
 # reactive infiltration properties
-D_LP = 1.95e-12 # cm2 s-1
+D_LP = 9.5e-6 # cm2 s-1
 l_c = 0.1 # cm
+h_c = 0.0076  # cm
+K_nucl_growth = 1.2e-15  # cm s-1
 k_C = 1.0
 k_SiC = 1.0
-chem_p = 250
-chem_scale = 700
 reactivity_upbound = 0.1
 reactivity_lowbound = 0.001
 
@@ -173,8 +173,10 @@ solidification_rate = 0.002
 #### stress-strain ####
 E = 400e9
 nu = 0.3
-phase_strain_coef = 10.0 # strain coefficient for the phase eigenstrain
-strain_Sactivate = 0.8 # strain at which the phase eigenstrain starts to activate
+E_Si = 160e9
+E_C = 400e9 
+nu_Si = 0.3
+nu_C = 0.3
 
 # thermal expansion coefficients (degree-1)
 Tref = 300  # K
@@ -491,14 +493,12 @@ popen_or_fail(
         "transition_saturation_front={:.18f}".format(transition_saturation_front),
         "transition_saturation_back={:.18f}".format(transition_saturation_back),
         "transition_saturation_back_start={:.18f}".format(transition_saturation_back_start),
-        "chem_p={:.18f}".format(chem_p),
-        "chem_scale={:.18f}".format(chem_scale),
         "reactivity_upbound={:.18f}".format(reactivity_upbound),
         "reactivity_lowbound={:.18f}".format(reactivity_lowbound),
         "htc={:.18f}".format(htc),
         # "phif_min={:.18f}".format(phif_min),
-        "phase_strain_coef={:.18f}".format(phase_strain_coef),
-        "strain_Sactivate={:.18f}".format(strain_Sactivate),
+        "K_nucl_growth={:.18f}".format(K_nucl_growth),
+        "h_c={:.18f}".format(h_c),
         "E={:.18f}".format(E),
         "nu={:.18f}".format(nu),
         "therm_expansion={:.18f}".format(g),
@@ -554,6 +554,10 @@ popen_or_fail(
         "kappa_C={:.18f}".format(kappa_C),
         "htc={:.18f}".format(htc),
         "E={:.18f}".format(E),
+        "E_Si={:.18f}".format(E_Si),
+        "E_C={:.18f}".format(E_C),
+        "nu_Si={:.18f}".format(nu_Si),
+        "nu_C={:.18f}".format(nu_C),
         "therm_expansion={:.18f}".format(g),
         "T0={:.18f}".format(Tmax_lsi),
         "Tref={:.18f}".format(Tref),
@@ -562,8 +566,6 @@ popen_or_fail(
         "H_latent={:.18f}".format(H_latent),
         "M_Si={:.18f}".format(M_Si),
         "phif_min={:.18f}".format(phif_min),
-        "phase_strain_coef={:.18f}".format(phase_strain_coef),
-        "strain_Sactivate={:.18f}".format(strain_Sactivate),
         "solidification_rate={:.18f}".format(solidification_rate),
         "gravity={:.18f}".format(gravity),
         "rho_Si={:.18f}".format(rho_Si),

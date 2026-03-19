@@ -1,5 +1,6 @@
 omega_Si_s = '${fparse M_Si/rho_Si_s}'
 omega_Si_l = '${fparse M_Si/rho_Si}'
+delta_Omega = '${fparse omega_Si_s/omega_Si_l-1}'
 
 [GlobalParams]
   temperature = 'T'
@@ -212,6 +213,15 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
       execute_on = 'INITIAL TIMESTEP_END'
     []
   []
+  [Jt]
+    order = CONSTANT
+    family = MONOMIAL
+    [AuxKernel]
+      type = MaterialRealAux
+      property = Jt
+      execute_on = 'INITIAL TIMESTEP_END'
+    []
+  []
   [Pc]
     order = CONSTANT
     family = MONOMIAL
@@ -221,12 +231,12 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
       execute_on = 'INITIAL TIMESTEP_END'
     []
   []
-  [Pp]
+  [rve_sh]
     order = CONSTANT
     family = MONOMIAL
     [AuxKernel]
       type = MaterialRealAux
-      property = Pp
+      property = rve_sh
       execute_on = 'INITIAL TIMESTEP_END'
     []
   []
@@ -276,11 +286,7 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
                 hf_rhof_onu=${fparse H_latent*rho_Si/mu_Si} hf_rhof2_onu=${fparse H_latent*rho_Si^2/mu_Si}
                 mhf_rhof=${fparse -H_latent*rho_Si} mphi_min=${fparse -phif_min}
                 Tref=${Tref} therm_expansion=${therm_expansion} Tref_l=${T0}
-                phase_strain_coef=${phase_strain_coef} strain_Sactivate=${strain_Sactivate}
-                overflow_Stransition_start=${overflow_Stransition_start}
-                overflow_Stransition_end=${overflow_Stransition_end}
-                overflow_Stransition_magnitude=${overflow_Stransition_magnitude}
-                E=${E} '
+                E=${E} E_fs=${E_Si} E_m=${E_C} nu_fs=${nu_Si} nu_m=${nu_C} delta_Omega=${delta_Omega}'
 
   [all]
     model = 'model'
@@ -301,11 +307,11 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
     moose_outputs = '     M1            M3             M4          M5           M6
                           M7            M8             M9          M10          M11             phiv
                           phif_s        phif_max       perm        pk1_stress   nonliquid       saturation
-                          Jt            Jt_sfs         Jt_p        pk2_stress   Pc              Pp'
+                          Jt            Jt_sfs         Jt_p        pk2_stress   Pc              rve_sh'
     neml2_outputs = '     state/M1      state/M3       state/M4    state/M5     state/M6
                           state/M7      state/M8       state/M9    state/M10    state/M11       state/phiv
                           state/phif_s  state/phif_max state/perm  state/pk1    state/nonliquid state/Seff
-                          state/Jt      state/Jt_sfs   state/Jt_p  state/pk2    state/Pc        state/Pp'
+                          state/Jt      state/Jt_sfs   state/Jt_p  state/pk2    state/Pc        state/rve_sh'
 
     moose_parameter_types = 'MATERIAL   MATERIAL   MATERIAL'
     moose_parameters = '     phis       phip       phi0SiC_noreact'
@@ -413,19 +419,19 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
     variable = T
     value = -1
   []
-  # [open_BC]
-  #  type = InfiltrationWake
-  #  boundary = 'left right top bottom'
-  #  inlet_flux = 0.0
-  #  outlet_flux = flux_out
-  #  product_fraction = nonliquid
-  #  product_fraction_derivative = dnonliquiddphif
-  #  solid_fraction = 0
-  #  solid_fraction_derivative = 0
-  #  variable = phif
-  #  sharpness = 100
-  #  no_flux_fraction_transition = 0.001
-  #[]
+  [open_BC]
+   type = InfiltrationWake
+   boundary = 'left right top bottom'
+   inlet_flux = 0.0
+   outlet_flux = flux_out
+   product_fraction = nonliquid
+   product_fraction_derivative = dnonliquiddphif
+   solid_fraction = 0
+   solid_fraction_derivative = 0
+   variable = phif
+   sharpness = 100
+   no_flux_fraction_transition = 0.001
+  []
 []
 
 [Executioner]

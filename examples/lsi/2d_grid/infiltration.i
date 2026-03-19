@@ -1,93 +1,90 @@
 ############### Input ################
 
-# Simulation parameters
-dt = 0.04 #s
-total_time = 1800 #s
-
-num_el_x = 51
-num_el_y = 101
-L = 0.1
-num_file_data = 5151
-C_ratio = 0.2
-
-flux_in = 0.005 # volume fraction
-flux_out = 0.1
-t_ramp = 500
-t_heat = 200
-
-dTdt = 1 # deg per s
-
-# heat enthalpy [g-cm2/s2]
-hf = 1e1
-
-#boundary conditions
-htc = 2000 #g / s3-K
-
-E = 10000000
-nu = 0.3
-therm_expansion = 0.0 # 1e-6
-T0 = 300
-
-# Molar Mass # g mol-1
-M_Si = 28.085
-M_SiC = 40.11
-M_C = 12.011
-
-# denisty # g cm-3
-rho_Si = 2.57 # density at liquid state
-rho_SiC = 3.21
-rho_C = 2.26
-
-# material property
-D_LP = 1.95e-12 # cm2 s-1
-l_c = 0.1 # cm
-chem_p = 250
-chem_scale = 700
-reactivity_upbound = 0.1
-reactivity_lowbound = 0.005
-
-brooks_corey_threshold = 0.1e5 # 0.5e5 #dyn/cm2
-capillary_pressure_power = 10
-phi_L_residual = 0.0
-
-permeability_power = 8
-
-# liquid viscosity
-# liquid silicon viscosity in egs -s
-mu_Si = 0.01 # g cm-1 s-1
-
-# solid reference permeability
-perm_ref = 1e-8
-
-# chemical reaction constant
-k_C = 1.0
-k_SiC = 1.0
-
-cp_Si = 0.7e7 # erg/g-K
-cp_SiC = 0.5e7 # erg/g-K
-cp_C = 1500e4 # erg/g-K
-
-strain_Sactivate = 0.0 #0.8 # strain at which the phase eigenstrain starts to activate
-phase_strain_coef = 0.0 #1e-5 # strain coefficient for the phase eigenstrain
-
-kappa_C = 3e7 # erg cm-1 s-1 K
-kappa_SiC = 3e7 # erg cm-1 s-1 K
-kappa_Si = 1.4e7 # erg cm-1 s-1
-
-# macroscopic property
-D_macro = 0.01 #cm2 s-1
-D_macro_high = 0.01 # cm2 s-1
-D_macro_low = 0.01 # cm2 s-1
-
-transition_saturation_front = 0.75
-transition_saturation_back = 0.45
-transition_saturation_back_start = 0.65
-
-gravity = 0.0 # 980.665
+##Simulation parameters
+# dt = 0.04 #s
+# total_time = 1800 #s
+# 
+# num_el_x = 51
+# num_el_y = 101
+# L = 0.1
+# num_file_data = 5151
+# C_ratio = 0.2
+# 
+# flux_in = 0.005 # volume fraction
+# flux_out = 0.1
+# t_ramp = 500
+# t_heat = 200
+# 
+# dTdt = 1 # deg per s
+# 
+# # heat enthalpy [g-cm2/s2]
+# hf = 1e1
+# 
+# #boundary conditions
+# htc = 2000 #g / s3-K
+# 
+# E = 10000000
+# nu = 0.3
+# therm_expansion = 0.0 # 1e-6
+# T0 = 300
+# 
+# # Molar Mass # g mol-1
+# M_Si = 28.085
+# M_SiC = 40.11
+# M_C = 12.011
+# 
+# # denisty # g cm-3
+# rho_Si = 2.57 # density at liquid state
+# rho_SiC = 3.21
+# rho_C = 2.26
+# 
+# # material property
+# D_LP = 9.5e-6 # cm2 s-1
+# l_c = 0.1 # cm
+# h_c = 0.0076 # cm
+# K_nucl_growth = 1.2e-15 # cm s-1
+# reactivity_upbound = 0.1
+# reactivity_lowbound = 0.005
+# 
+# brooks_corey_threshold = 0.5e5 # 0.5e5 #dyn/cm2
+# capillary_pressure_power = 10
+# phi_L_residual = 0.0
+# 
+# permeability_power = 20.0
+# 
+# # liquid viscosity
+# # liquid silicon viscosity in egs -s
+# mu_Si = 0.01 # g cm-1 s-1
+# 
+# # solid reference permeability
+# perm_ref = 1e-8
+# 
+# # chemical reaction constant
+# k_C = 1.0
+# k_SiC = 1.0
+# 
+# cp_Si = 0.7e7 # erg/g-K
+# cp_SiC = 0.5e7 # erg/g-K
+# cp_C = 1500e4 # erg/g-K
+# 
+# kappa_C = 3e7 # erg cm-1 s-1 K
+# kappa_SiC = 3e7 # erg cm-1 s-1 K
+# kappa_Si = 1.4e7 # erg cm-1 s-1
+# 
+# # macroscopic property
+# D_macro = 0.0007 #cm2 s-1
+# D_macro_high = 0.04 # cm2 s-1
+# D_macro_low = 0.0007 # cm2 s-1
+# 
+# transition_saturation_front = 0.75
+# transition_saturation_back = 0.25
+# transition_saturation_back_start = 0.65
+# 
+# gravity = 980.665
 
 ##
 ## Calculations
-D_bar = '${fparse D_LP/(l_c^2)}'
+D_bar = '${fparse D_LP/(l_c)}'
 
 omega_C = '${fparse M_C/rho_C}'
 omega_Si = '${fparse M_Si/rho_Si}'
@@ -272,15 +269,6 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
       execute_on = 'INITIAL TIMESTEP_END'
     []
   []
-  [Pp]
-    order = CONSTANT
-    family = MONOMIAL
-    [AuxKernel]
-      type = MaterialRealAux
-      property = Pp
-      execute_on = 'INITIAL TIMESTEP_END'
-    []
-  []
   [Pc]
     order = CONSTANT
     family = MONOMIAL
@@ -308,6 +296,15 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
       execute_on = 'INITIAL TIMESTEP_END'
     []
   []
+  [reaction_rate]
+    order = CONSTANT
+    family = MONOMIAL
+    [AuxKernel]
+      type = MaterialRealAux
+      property = reaction_rate
+      execute_on = 'INITIAL TIMESTEP_END'
+    []
+  []
 []
 
 [NEML2]
@@ -316,20 +313,18 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
               rhof2_nu=${fparse rho_Si^2/mu_Si} phif_residual=${phi_L_residual} rho_f=${rho_Si}
               brooks_corey_threshold=${brooks_corey_threshold} capillary_pressure_power=${capillary_pressure_power}
               nu=${nu} hf_rhof_nu=${fparse hf*rho_Si/mu_Si}
-              chem_scale=${fparse chem_scale/omega_Si} chem_p=${chem_p} oP_oL=${fparse omega_SiC/omega_Si}
+              oP_oL=${fparse omega_SiC/omega_Si}
               hf_rhof2_nu=${fparse hf*rho_Si^2/mu_Si} therm_expansion=${therm_expansion} Tref=${T0}
               omega_Si=${omega_Si} D=${D_bar} oSiCm1=${oSiCm1} oCm1=${oCm1}
               chem_ratio=${chem_ratio} mchem_P=${fparse -k_SiC}
               rhocp_Si=${fparse rho_Si*cp_Si} rhocp_SiC=${fparse rho_SiC*cp_SiC} rhocp_C=${fparse rho_C*cp_C}
-              E=${E} Dmacro=${D_macro} strain_Sactivate=${strain_Sactivate} phase_strain_coef=${phase_strain_coef}
+              E=${E} Dmacro=${D_macro}
+              K_nucl_growth=${fparse K_nucl_growth*l_c} mhcolc=${fparse -h_c/l_c} omega_SiC=${omega_SiC}
               kap_C=${kappa_C} kap_SiC=${kappa_SiC} kap_Si=${kappa_Si}
               new_scale=${new_scale} transition_saturation_back=${transition_saturation_back}
               transition_saturation_back_start=${transition_saturation_back_start}
               transition_saturation_front=${transition_saturation_front}
               reactivity_upbound=${reactivity_upbound} reactivity_lowbound=${reactivity_lowbound}
-              overflow_Stransition_start=${overflow_Stransition_start}
-              overflow_Stransition_end=${overflow_Stransition_end}
-              overflow_Stransition_magnitude=${overflow_Stransition_magnitude}
               delta_Dscale_front=${fparse D_macro_high-D_macro}
               delta_Dscale_back=${fparse D_macro_low-D_macro}
               '
@@ -354,11 +349,11 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
                           MATERIAL       MATERIAL    MATERIAL       MATERIAL        MATERIAL    MATERIAL
                           MATERIAL'
     moose_outputs = '     pk1_stress     M1          M7             M3              M4          M6
-                          M2             phis        phip           pk2_stress      Pp          Pc
+                          M2             phis        phip           pk2_stress      Pc          reaction_rate
                           M5             M8          phif_max       phiptotal       Jt          Seff
                           phiv'
     neml2_outputs = '     state/pk1      state/M1    state/M7       state/M3        state/M4    state/M6
-                          state/M2       state/phis  state/phip     state/pk2       state/Pp    state/Pc
+                          state/M2       state/phis  state/phip     state/pk2       state/Pc    state/react_new
                           state/M5       state/M8    state/phif_max state/phiptotal state/Jt    state/Seff
                           state/phiv'
 
@@ -496,7 +491,7 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
   nl_max_its = 10
 
   end_time = ${total_time}
-  dtmax = '${fparse 1000*dt}'
+  dtmax = '${fparse 10000*dt}'
 
   [TimeStepper]
     type = IterationAdaptiveDT
@@ -505,7 +500,7 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
     iteration_window = 2
     cutback_factor = 0.5
     cutback_factor_at_failure = 0.2
-    growth_factor = 1.5
+    growth_factor = 2.0
     linear_iteration_ratio = 100
   []
 

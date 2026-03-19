@@ -1,3 +1,7 @@
+[Settings]
+  additional_libraries = 'neml2/puma_custom_neml2'
+[]
+
 [Models]
     ## Shared models among different sub-models
     [Jacobian]
@@ -192,37 +196,17 @@
         models = 'permeability phif_max'
     []
 
-    ## fluid overflow pressure
-    [Pp_function_form]
-        type = HermiteSmoothStep
-        argument = 'state/phiv'
-        value = 'state/Pp_form'
-        lower_bound = ${overflow_Stransition_start}
-        upper_bound = ${overflow_Stransition_end}
-        complement = true
-    []
-    [Pp_premodel]
-        type = ScalarMultiplication
-        from_var = 'state/Pp_form'
-        to_var = 'state/Pp'
-        coefficient = ${overflow_Stransition_magnitude}
-    []
-    [Pp]
-        type = ComposedModel
-        models = 'Pp_function_form Pp_premodel phiv'
-    []
-
     #pore pressure
     [Ppore_premodel]
         type = ScalarLinearCombination
-        from_var = 'state/Pc state/Pp'
+        from_var = 'state/Pc'
         to_var = 'state/Ppore'
-        coefficients = '1.0 -1.0'
+        coefficients = '1.0'
     []
     [Ppore]
         type = ComposedModel
-        models = 'Ppore_premodel Pp cap'
-        additional_outputs = 'state/Pp state/Pc'
+        models = 'Ppore_premodel cap'
+        additional_outputs = 'state/Pc'
     []
 
     ## Jtotal
@@ -288,42 +272,69 @@
         deformation_gradient = 'state/Fe'
         strain = 'state/Ee'
     []
-    [S_pk2]
+
+    ## elastic stress
+    [S_pk2_e]
         type = LinearIsotropicElasticity
         strain = 'state/Ee'
-        stress = 'state/pk2_SR2'
+        stress = 'state/pk2_e_SR2'
         coefficients = '${E} 0.3'
         coefficient_types = 'YOUNGS_MODULUS POISSONS_RATIO'
     []
-    [S_pk2_R2]
+    [S_pk2_e_R2]
         type = SR2toR2
-        input = 'state/pk2_SR2'
-        output = 'state/pk2'
+        input = 'state/pk2_e_SR2'
+        output = 'state/pk2_e'
     []
+    ## hydrostatic RVE stress
+    [ee_vol]
+        type = SR2AverageVolumetric
+        input = 'state/Ee'
+        average_volumetric = 'state/Ee_ave_vol'
+    []
+    [zero_parameter]
+        type = ScalarParameterToState
+        from = 0.0
+        to = 'state/zero'
+    []
+    [rve_sh]
+        type = PhaseChangeRadialStress
+        E_s = '${E_fs}'
+        nu_s = '${nu_fs}'
+        E_m = '${E_m}'
+        nu_m = '${nu_m}'
+        delta_Omega = '${delta_Omega}'
+        macroscopic_strain = 'state/Ee_ave_vol'
+        pore_pressure = 'state/zero'
+        matrix_volume_fraction = 'state/phi_sp'
+        new_phase_volume_fraction = 'state/phif_s'
+        hydrostatic_stress = 'state/rve_sh'
+    []
+    [S_pk2_h]
+        type = PK2HydrostaticStress
+        hydrostatic_stress = 'state/rve_sh'
+        deformation_gradient = 'forces/F'
+        pk2_stress = 'state/pk2_sh'
+    []
+    [S_pk2]
+        type = R2LinearCombination
+        from_var = 'state/pk2_e state/pk2_sh'
+        to_var = 'state/pk2'
+    []
+    ##
     [S_pk1]
         type = R2Multiplication
         A = 'forces/F'
         B = 'state/pk2'
-        to = 'state/pk1_stress'
+        to = 'state/pk1'
         invert_B = false
-    []
-    [pore_stress]
-        type = BiotPorePressureStress
-        pore_pressure = 'state/Pp'
-        deformation_gradient = 'forces/F'
-        pk1_stress = 'state/pk1_pore'
-    []
-    [S_pk1_total]
-        type = R2LinearCombination
-        from_var = 'state/pk1_stress state/pk1_pore'
-        to_var = 'state/pk1'
-        coefficients = '1.0 1.0'
     []
     [model_sm]
         type = ComposedModel
-        models = 'Jtotal totalF green_strain S_pk2 S_pk2_R2 S_pk1
-        pore_stress Pp S_pk1_total'
-        additional_outputs = 'state/pk2'
+        models = 'Jtotal totalF green_strain phisp S_pk2_e S_pk2_e_R2
+                    ee_vol zero_parameter rve_sh S_pk2_h
+                    S_pk2 S_pk1'
+        additional_outputs = 'state/pk2 state/rve_sh'
     []
 
     ## MATERIAL OUTPUTS

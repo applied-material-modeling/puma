@@ -1,7 +1,22 @@
+[Settings]
+  additional_libraries = 'neml2/puma_custom_neml2'
+[]
+
 [Solvers]
     [newton]
         type = Newton
         verbose = false
+        linear_solver = 'lu'
+    []
+    [lu]
+        type = DenseLU
+    []
+[]
+
+[EquationSystems]
+    [eq_sys]
+        type = NonlinearSystem
+        model = 'model_residual'
     []
 []
 
@@ -35,7 +50,7 @@
         upper_bound = 0.1
     []
     [reaction_rate]
-        type = DiffusionLimitedReaction
+        type = DiffusionLimitedReactionUpdate
         diffusion_coefficient = '${D}'
         molar_volume = '${omega_Si}'
         product_inner_radius = 'state/ri'
@@ -105,7 +120,7 @@
     []
     [model_update]
         type = ImplicitUpdate
-        implicit_model = 'model_residual'
+        equation_system = 'eq_sys'
         solver = 'newton'
     []
     [model_solver]
@@ -142,7 +157,7 @@
         upper_bound = 0.1
     []
     [reaction_rate_new]
-        type = DiffusionLimitedReaction
+        type = DiffusionLimitedReactionUpdate
         diffusion_coefficient = '${D}'
         molar_volume = '${omega_Si}'
         product_inner_radius = 'state/ri'
@@ -209,7 +224,7 @@
         permeability = 'state/perm'
     []
     [effective_saturation]
-        type = EffectiveSaturation
+        type = EffectiveSaturationSecondOrder
         residual_saturation = 0.00001
         fluid_fraction = 'forces/phif'
         max_fraction = 'state/phif_max'

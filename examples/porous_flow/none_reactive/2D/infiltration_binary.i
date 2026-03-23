@@ -247,14 +247,14 @@ gravity = 980.665
 
 [Outputs]
   exodus = true
-  # file_base = '${base_folder}/core'
+  file_base = 'example/core'
   [console]
     type = Console
     execute_postprocessors_on = 'NONE'
   []
   [csv]
     type = CSV
-    # file_base = '${base_folder}/out'
+    file_base = 'example/out'
   []
   print_linear_residuals = false
 []

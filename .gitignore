@@ -119,6 +119,7 @@ test.cache
 !**/gold/*.xml*
 !**/gold/*.json*
 !**/gold/experiment_comp/*.csv
+!**/**/initial_condition.csv
 
 peacock_run_tmp.i
 yaml_dump*
@@ -229,6 +230,10 @@ python/MooseDocs/test/output
 !python/MooseDocs/test/gold/**/*.html
 !python/MooseDocs/test/gold/**/*.tex
 .ruby-version
+
+!neml2_models/CMakeLists.txt
+!neml2_models/tests/CMakeLists.txt
+!images/puma_architecture.png
 
 # Chigger
 !python/chigger/tests/**/gold/*.png
@@ -344,3 +349,30 @@ puma.yaml
 
 
 .nfs*
+
+.cache
+build
+example
+check_init
+*_cp
+
+output
+output_bestfit
+plots
+plots_bestfit
+p1e*
+output_bigpore*
+output_smallpore*
+plots_bigpore*
+plots_smallpore*
+pyramid_cube
+
+typical
+check_order
+results
+results_2
+
+main
+main_highres
+logs
+video_simulation

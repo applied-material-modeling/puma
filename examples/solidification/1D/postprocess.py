@@ -1,89 +1,60 @@
 from matplotlib import pyplot as plt
 from matplotlib import colors, cm
 import pandas as pd
-import numpy as np
-import torch
-import os
+from pathlib import Path
 
-## Input
-basefolder = "example_1D/"
-plotfolder = "plot_example_1D"
+out_dir = Path("output")
+plt_dir = Path("plots")
+plt_dir.mkdir(exist_ok=True)
+nstep = len(list(out_dir.glob("out_value_*.csv")))
+summary = pd.read_csv(out_dir / "out.csv")
+times = summary["time"]
 
-if not os.path.isdir(plotfolder):
-    os.mkdir(plotfolder)
+step = 1
 
-postdata = pd.read_csv(basefolder + "out.csv")
-times = postdata["time"]
-
-tscale = 3600  # division from seconds
-
-## Set up plot ------------------------------------------------------------
-font = {"family": "monospace"}
-fsize = 11
-figsize = (8.5, 6)
+font = {"family": "arial"}
+fsize = 13
+figsize = (5.22, 3.4)
 lw = 1
 
-norm = colors.Normalize(vmin=times.iloc[0] / tscale, vmax=times.iloc[-1] / tscale)
-sm = cm.ScalarMappable(norm=norm, cmap="rainbow")
+plt.rc("font", size=fsize)  # controls default text sizes
+plt.rc("axes", titlesize=fsize)  # fontsize of the axes title
+plt.rc("axes", labelsize=fsize)  # fontsize of the x and y labels
+plt.rc("xtick", labelsize=fsize)  # fontsize of the tick labels
+plt.rc("ytick", labelsize=fsize)  # fontsize of the tick labels
+plt.rc("legend", fontsize=fsize)  # legend fontsize
+plt.rc("figure", titlesize=fsize)  # fontsize of the figure title
 
-### Main ---------------------------------------------------------------------
 
-id = ["results"]
-idlist = [["T", "solidification_fraction", "Tdot", "heat_release"]]
-idy = [
-    [
-        "temperature (K)",
-        "solidification fraction",
-        "dT/dt (K/s)",
-        "heat release",
-    ],
+# colormap
+norm = colors.Normalize(vmin=times.iloc[0], vmax=times.iloc[-1])
+sm = cm.ScalarMappable(norm=norm, cmap="coolwarm")
+
+qois = [
+    "phif",
+    "T",
+    "phif_s",
+    "nonliquid",
+    "porosity",
+    "phifl_rate",
+    "heat_generate",
+    "permeability",
+    "P"
 ]
 
-for keyid in range(len(id)):
-    plt.rc("font", **font)
-    plt.rc("font", **font, size=fsize)  # controls default text sizes
-    plt.rc("axes", titlesize=fsize)  # fontsize of the axes title
-    plt.rc("axes", labelsize=fsize)  # fontsize of the x and y labels
-    plt.rc("xtick", labelsize=fsize)  # fontsize of the tick labels
-    plt.rc("ytick", labelsize=fsize)  # fontsize of the tick labels
-    plt.rc("legend", fontsize=fsize)  # legend fontsize
-    plt.rc("figure", titlesize=fsize)  # fontsize of the figure title
+for qoi in qois:
+    fig, ax = plt.subplots(figsize=figsize)
+    for i in range(1, nstep, step):
+        df = pd.read_csv(out_dir / "out_value_{:04d}.csv".format(i))
+        ax.plot(df["x"], df[qoi], color=sm.to_rgba(times.iloc[i]))
+    # set a horizontal colorbar
 
-    fig, ax = plt.subplots(2, 2)
-    fig.set_size_inches(figsize)
+    fig.colorbar(sm, ax=ax, label="Time [s]")
 
-    for i in range(1, 100000):
-        filename = basefolder + "out_line_{:04d}.csv".format(i)
-        if not os.path.isfile(filename):
-            break
-        data = pd.read_csv(filename)
+    # ax.set_xlim(0, 0.15)
 
-        ax[0, 0].plot(
-            data["x"], data[idlist[keyid][0]], color=sm.to_rgba(times.iloc[i] / tscale)
-        )
-        ax[0, 0].set(ylabel=idy[keyid][0])
-
-        ax[0, 1].plot(
-            data["x"], data[idlist[keyid][1]], color=sm.to_rgba(times.iloc[i] / tscale)
-        )
-        ax[0, 1].set(ylabel=idy[keyid][1])
-
-        ax[1, 0].plot(
-            data["x"], data[idlist[keyid][2]], color=sm.to_rgba(times.iloc[i] / tscale)
-        )
-        ax[1, 0].set(ylabel=idy[keyid][2])
-        ax[1, 0].set(xlabel="x (m)")
-
-        ax[1, 1].plot(
-            data["x"], data[idlist[keyid][3]], color=sm.to_rgba(times.iloc[i] / tscale)
-        )
-        ax[1, 1].set(ylabel=idy[keyid][3])
-        ax[1, 1].set(xlabel="x (m)")
-
-    fig.tight_layout(w_pad=2.8)
-    cbar_ax = fig.add_axes([0.9, 0.12, 0.02, 0.8])
-    fig.subplots_adjust(right=0.88)
-    fig.colorbar(sm, cax=cbar_ax, label="time [hrs]", aspect=100, fraction=0.5)
-
-    fig.savefig(plotfolder + "/{}.png".format(id[keyid]))
+    ax.set_ylabel("{}".format(qoi))
+    ax.set_xlabel("x")
+    fig.tight_layout()
+    fig.savefig(plt_dir / "{}.png".format(qoi), dpi=300)
     plt.close(fig)

@@ -1,7 +1,7 @@
 ############### Input ################
 # Simulation parameters
 dt = 20
-nx = 200
+nx = 100
 
 # denisty kgm-3
 rho_s = 2100
@@ -323,7 +323,7 @@ xmax = 2.0
     []
     [csv]
         type = CSV
-        file_base = 'example_1D/out'
+        file_base = 'example/out'
     []
     print_linear_residuals = false
 []

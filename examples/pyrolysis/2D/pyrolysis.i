@@ -1,8 +1,8 @@
 ############### Input ################
 # Simulation parameters
 dt = 5
-nx = 10
-ny = 10
+nx = 20
+ny = 20
 xmax = 0.5
 
 # denisty kgm-3
@@ -400,7 +400,7 @@ htc = 200 #Wm-2K assume air doesnt move much
     []
     [csv]
         type = CSV
-        file_base = 'heating_and_cooling_2/out'
+        file_base = 'example/out'
     []
     print_linear_residuals = false
 []

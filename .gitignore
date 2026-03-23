@@ -233,7 +233,7 @@ python/MooseDocs/test/output
 
 !neml2_models/CMakeLists.txt
 !neml2_models/tests/CMakeLists.txt
-!images
+!images/puma_architecture.png
 
 # Chigger
 !python/chigger/tests/**/gold/*.png

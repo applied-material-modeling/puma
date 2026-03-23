@@ -355,19 +355,19 @@ delta_Omega = '${fparse omega_Si_s/omega_Si_l-1}'
     variable = T
     value = -1
   []
-  [open_BC]
-    type = InfiltrationWake
-    boundary = 'left right top bottom'
-    inlet_flux = 0.0
-    outlet_flux = flux_out
-    product_fraction = nonliquid
-    product_fraction_derivative = dnonliquiddphif
-    solid_fraction = 0
-    solid_fraction_derivative = 0
-    variable = phif
-    sharpness = 100
-    no_flux_fraction_transition = 0.001
-  []
+  # [open_BC]
+  #   type = InfiltrationWake
+  #   boundary = 'left right top bottom'
+  #   inlet_flux = 0.0
+  #   outlet_flux = flux_out
+  #   product_fraction = nonliquid
+  #   product_fraction_derivative = dnonliquiddphif
+  #   solid_fraction = 0
+  #   solid_fraction_derivative = 0
+  #   variable = phif
+  #   sharpness = 100
+  #   no_flux_fraction_transition = 0.001
+  # []
 []
 
 [Executioner]

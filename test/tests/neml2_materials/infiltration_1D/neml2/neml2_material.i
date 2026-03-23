@@ -83,7 +83,7 @@ initial_product_dummy_thickness = 1e-3
     [switchoff_diff]
         type = HermiteSmoothStep
         argument = 'state/rate_transition'
-        value = 'state/Hnucl'
+        value = 'state/Hdiff'
         lower_bound = 0.0
         upper_bound = 0.1
         complement = false
@@ -242,7 +242,7 @@ initial_product_dummy_thickness = 1e-3
     [switchoff_diff_new]
         type = HermiteSmoothStep
         argument = 'state/rate_transition'
-        value = 'state/Hnucl'
+        value = 'state/Hdiff'
         lower_bound = 0.0
         upper_bound = 0.1
         complement = false

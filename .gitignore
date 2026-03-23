@@ -231,6 +231,10 @@ python/MooseDocs/test/output
 !python/MooseDocs/test/gold/**/*.tex
 .ruby-version
 
+!neml2_models/CMakeLists.txt
+!neml2_models/tests/CMakeLists.txt
+!images
+
 # Chigger
 !python/chigger/tests/**/gold/*.png
 !python/chigger/tests/input/*.e*

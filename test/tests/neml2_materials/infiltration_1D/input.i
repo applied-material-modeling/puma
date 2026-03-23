@@ -55,7 +55,7 @@ transition_saturation_back_start = 0.45
 
 # initial condition
 phi_noreact = 0.36
-phi0_SiC = 0.0
+phi0_SiC = 0.0001
 phi0_C = 0.10
 
 gravity = 980.665

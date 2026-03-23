@@ -47,11 +47,11 @@ def popen_or_fail(step_name, argv, log_path=None):
 ###############################################################################################
 
 pip_cycle_n = 2  # number of pip cycles
-save_folder = "main_highres"
-corenum = 10  # number of cores used for simulation
+save_folder = "out_2"
+corenum = 14  # number of cores used for simulation
 puma_run_file = "./../../../puma-opt"
 
-run_pip = False  # run the PIP simulation
+run_pip = True  # run the PIP simulation
 
 # rate of close pore relative to volume of produced gas
 def cp_to_wg_relation(volume_binder, relation=0.001):

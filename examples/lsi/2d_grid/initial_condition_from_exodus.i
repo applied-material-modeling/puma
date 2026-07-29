@@ -63,6 +63,12 @@
         coupled_variables = 'phi0SiC_noreact'
         expression = 'phi0SiC_noreact'
     []
+    [phinoreact]
+        type = ParsedMaterial
+        property_name = phinoreact
+        coupled_variables = 'phi0SiC_noreact'
+        expression = 'phi0SiC_noreact'
+    []
 []
 
 #### Transfer of solid mechanics information ####

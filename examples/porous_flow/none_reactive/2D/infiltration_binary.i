@@ -2,30 +2,19 @@
 
 # Simulation parameters
 dt = 5 #s
-total_time = 10000 #s
+total_time = 3000 #s
 
 flux_in = 0.1 # volume fraction
 flux_out = 0.1
 t_ramp = 1000
 
-# denisty # g cm-3
-rho_PR = 2.00 # density at liquid state
-
-brooks_corey_threshold = 3e4 #Pa
-capillary_pressure_power = 3
-phi_L_residual = 0.0
-
-permeability_power = 3
-
-# liquid viscosity
-mu_PR = 10
-
-# solid permeability
-kk_PR = 2e-5
+# density # g cm-3
+rho_PR = 2.57
 
 # macroscopic property
-D_macro = 0.0 #cm2 s-1
+D_macro = 0.005 #cm2 s-1
 
+# initial condition
 porosity_feature = 0.2
 porosity_background = 0.8
 
@@ -121,30 +110,13 @@ gravity = 980.665
 []
 
 [NEML2]
-  input = 'neml2/neml2_material.i'
-  cli_args = 'kk_L=${kk_PR} permeability_power=${permeability_power} rhof_nu=${fparse rho_PR/mu_PR}
-              rhof2_nu=${fparse rho_PR^2/mu_PR} phif_residual=${phi_L_residual}
-              brooks_corey_threshold=${brooks_corey_threshold} capillary_pressure_power=${capillary_pressure_power}'
+  input = 'neml2/aoti/model_aoti.i'
   [all]
     model = 'model'
     verbose = true
     device = 'cpu'
 
-    moose_input_types = 'VARIABLE'
-    moose_inputs = '     phif'
-    neml2_inputs = '     forces/phif'
-
-    moose_parameter_types = 'MATERIAL'
-    moose_parameters = '     void'
-    neml2_parameters = '     phif_max_param'
-
-    moose_output_types = 'MATERIAL MATERIAL MATERIAL MATERIAL   MATERIAL    MATERIAL'
-    moose_outputs = '     M3       M4       M5       poro       phis        perm'
-    neml2_outputs = '     state/M3 state/M4 state/M5 state/poro state/solid state/perm'
-
-    moose_derivative_types = 'MATERIAL              MATERIAL'
-    moose_derivatives = '     dM5dphif              dM4dphif'
-    neml2_derivatives = '     state/M5 forces/phif; state/M4 forces/phif'
+    derivatives = 'M5 phif dM5dphif; M4 phif dM4dphif; M3 phif dM3dphif'
   []
 []
 
@@ -156,8 +128,8 @@ gravity = 980.665
   []
   [constant_derivative]
     type = GenericConstantMaterial
-    prop_names = 'dM1dphif dM1dP dM2dphif dM2dP dM3dphif dM3dP dM4dP dM5dP'
-    prop_values = '0.0     0.0   0.0     0.0    0.0     0.0    0.0   0.0'
+    prop_names = 'dM1dphif dM1dP dM2dphif dM2dP dM3dP dM4dP dM5dP'
+    prop_values = '0.0     0.0   0.0     0.0    0.0   0.0   0.0'
   []
   [void_feature]
     type = GenericConstantMaterial
@@ -206,7 +178,7 @@ gravity = 980.665
     outlet_flux = flux_out
     product_fraction = 0.0001
     product_fraction_derivative = 0.0
-    solid_fraction = phis
+    solid_fraction = solid
     solid_fraction_derivative = 0.0
     variable = phif
   []

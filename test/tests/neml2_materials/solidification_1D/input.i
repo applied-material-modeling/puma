@@ -4,36 +4,20 @@ dt = 20
 nx = 20
 
 # models
-Ts = 1687
-Tf = 1707
 
 # Molar Mass # g mol-1
-M_Si = 28.085
 
 # solidfication information
-H_latent = 1.2e8 # erg/g -- 1.2e8 for theoretical
-solidification_rate = 0.005
 Tmax = 1720 #K
 T0 = 300 #K
 phif_min = 0.002
 
 # density
 rho_Si = 2.57 # density at liquid state
-rho_Si_s = 2.37 # density at solid state
-rho_SiC = 3.210
-rho_C = 2.260
 
 # specific heat
-cp_Si = 0.7e7 # erg/g-K
-cp_Si_s = 0.5e7 # erg/g-K
-cp_SiC = 550e4
-cp_C = 1500e4
 
 # thermal conductivity #[erg cm-1 s-1 K]
-kappa_Si = 1.4e7
-kappa_Si_s = 1.4e7
-kappa_SiC = 3e7
-kappa_C = 3e8
 
 # Heating conditions
 dTdt = -60 #Kmin-1 heating rate
@@ -51,15 +35,10 @@ total_time = '${fparse t_ramp + t_hold}'
 htc = 2000 #g / s3-K
 
 # porous flow
-brooks_corey_threshold = 1e4 #Pa
-capillary_pressure_power = 10
 
 # solid permeability
-kk_Si = 1e-8
-permeability_power = 8
 
 # liquid viscosity
-mu_Si = 0.01
 
 # macroscopic property
 D_macro = 0.001 #cm2 s-1
@@ -76,8 +55,6 @@ xmax = 200.0
 gravity = 980.665 # cm/s2
 
 # Calculations
-omega_Si_s = '${fparse M_Si/rho_Si_s}'
-omega_Si_l = '${fparse M_Si/rho_Si}'
 
 [GlobalParams]
     temperature = 'T'
@@ -209,76 +186,24 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
 []
 
 [NEML2]
-    input = 'neml2/neml2_material.i'
-    cli_args = 'rho_f=${rho_Si} rhof_nu=${fparse rho_Si/mu_Si} rhof2_nu=${fparse rho_Si^2/mu_Si}
-                brooks_corey_threshold=${brooks_corey_threshold}
-                capillary_pressure_power=${capillary_pressure_power}
-                permeability_power=${permeability_power} kk_L=${kk_Si}
-                TlmTs=${fparse 1/(Tf-Ts)} mTs_o_TlmTs=${fparse -Ts/(Tf-Ts)} s_TlmTs=${fparse 6/(Tf-Ts)}
-                Tl=${Tf} Ts=${Ts} m_solidification_rate=${fparse -solidification_rate}
-                o_omegaf=${fparse 1/omega_Si_l} mOfs_Ofl=${fparse -omega_Si_s/omega_Si_l}
-                cp_rhofl=${fparse cp_Si*rho_Si} cp_rhofs=${fparse cp_Si_s*rho_Si_s}
-                cp_rhos=${fparse cp_C*rho_C} cp_rhop=${fparse cp_SiC*rho_SiC}
-                kap_fl=${kappa_Si} kap_fs=${kappa_Si_s} kap_s=${kappa_C} kap_p=${kappa_SiC}
-                hf_rhof_onu=${fparse H_latent*rho_Si/mu_Si} hf_rhof2_onu=${fparse H_latent*rho_Si^2/mu_Si}
-                mhf_rhof=${fparse -H_latent*rho_Si} mphi_min=${fparse -phif_min}'
-
+    input = '../../../../neml2_models/aoti/solidification_1d/model_aoti.i'
     [all]
         model = 'model'
         verbose = true
         device = 'cpu'
 
-        moose_input_types = 'POSTPROCESSOR POSTPROCESSOR
-                             VARIABLE      VARIABLE      MATERIAL'
-        moose_inputs = '     time          time
-                             phif          T             phif_s'
-        neml2_inputs = '     forces/t      old_forces/t
-                             forces/phif   forces/T      old_state/phif_s'
-
-        moose_output_types = 'MATERIAL      MATERIAL       MATERIAL    MATERIAL    MATERIAL
-                              MATERIAL      MATERIAL       MATERIAL    MATERIAL    MATERIAL
-                              MATERIAL      MATERIAL       MATERIAL    MATERIAL    '
-        moose_outputs = '     M1            M3             M4          M5          M6
-                              M7            M8             M9          M10         M11
-                              phif_s        phif_max       perm        nonliquid'
-        neml2_outputs = '     state/M1      state/M3       state/M4    state/M5    state/M6
-                              state/M7      state/M8       state/M9    state/M10   state/M11
-                              state/phif_s  state/phif_max state/perm  state/nonliquid'
-
-        moose_parameter_types = 'MATERIAL       MATERIAL   MATERIAL   '
-        moose_parameters = '     Jacobian       phis       phip       '
-        neml2_parameters = '     Jacobian_param phis_param phip_param '
-
-        moose_derivative_types = '
-                                  MATERIAL
-                                  MATERIAL
-                                  MATERIAL
-                                  MATERIAL            MATERIAL
-                                  MATERIAL            MATERIAL
-                                  MATERIAL            MATERIAL
-                                  MATERIAL
-                                  MATERIAL
-                                  MATERIAL            MATERIAL'
-        moose_derivatives = '
-                                  dM3dT
-                                  dM4dT
-                                  dM5dT
-                                  dM6dT               dM6dphif
-                                  dM7dT               dM7dphif
-                                  dM8dT               dM8dphif
-                                  dM9dT
-                                  dM10dT
-                                  dM11dT              dM11dphif'
-        neml2_derivatives = '
-                                  state/M3  forces/T;
-                                  state/M4  forces/T;
-                                  state/M5  forces/T;
-                                  state/M6  forces/T; state/M6  forces/phif;
-                                  state/M7  forces/T; state/M7  forces/phif;
-                                  state/M8  forces/T; state/M8  forces/phif;
-                                  state/M9  forces/T;
-                                  state/M10 forces/T;
-                                  state/M11 forces/T; state/M11 forces/phif'
+        # Inputs/outputs auto-map by name (T, phif -> VARIABLE; t -> TIME;
+        # phis, phip, phif_s(old ~1) -> MATERIAL). Derivatives alias the NEML2
+        # (output input) pair to the MOOSE property name the kernels read.
+        derivatives = 'M3 T dM3dT; M4 T dM4dT; M5 T dM5dT;
+                       M6 T dM6dT; M6 phif dM6dphif;
+                       M7 T dM7dT; M7 phif dM7dphif;
+                       M8 T dM8dT; M8 phif dM8dphif;
+                       M9 T dM9dT; M10 T dM10dT;
+                       M11 T dM11dT; M11 phif dM11dphif;
+                       M3 phif dM3dphif; M4 phif dM4dphif; M5 phif dM5dphif;
+                       M9 phif dM9dphif; M10 phif dM10dphif;
+                       nonliquid phif dnonliquiddphif'
 
         initialize_outputs = '      phif_s'
         initialize_output_values = 'solidified_fluid'
@@ -300,10 +225,8 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
     []
     [zero_mat_derivative]
         type = GenericConstantMaterial
-        prop_names = ' dM1dT    dM1dphif  dM2dT           dM2dphif dM3dphif dM4dphif dM5dphif
-                       dM9dphif dM10dphif dnonliquiddphif'
-        prop_values = '0.0      0.0       0.0             0.0      0.0      0.0      0.0
-                       0.0      0.0       0.0'
+        prop_names = ' dM1dT dM1dphif dM2dT dM2dphif'
+        prop_values = '0.0   0.0      0.0   0.0'
     []
     [pressure_nodependence_mat_prop]
         type = GenericConstantMaterial
@@ -492,9 +415,10 @@ omega_Si_l = '${fparse M_Si/rho_Si}'
 
     # reuse_preconditioner = true
     # reuse_preconditioner_max_linear_its = 25
-    automatic_scaling = true
 
     # residual_and_jacobian_together = 'true'
+
+    automatic_scaling = true
 
     line_search = none
 

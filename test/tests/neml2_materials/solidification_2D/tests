@@ -5,4 +5,17 @@
     exodiff = 'input_out.e'
     requirement = 'Make sure output is the same.'
   []
+  [check_jacobian]
+    type = 'PetscJacobianTester'
+    input = 'input.i'
+    run_sim = True
+    ratio_tol = 1e-5
+    difference_tol = 1.0
+    # Full-transient FD Jacobian over the 2D solid-mechanics-coupled solve is slow
+    # (~500 s); raise the per-test timeout so it can complete. Runs plain Newton
+    # (no VI/Bounds, incompatible with -snes_test_jacobian). Max ratio ~8.2e-6.
+    max_time = 1200
+    cli_args = "Executioner/petsc_options_iname='-pc_type' Executioner/petsc_options_value='lu' Bounds/active=''"
+    requirement = 'The hand-coded Jacobian shall match the finite-difference Jacobian.'
+  []
 []

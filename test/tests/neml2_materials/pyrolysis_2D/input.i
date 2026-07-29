@@ -11,29 +11,13 @@ rho_b = 1250 # 1.2 and 1.4
 rho_p = 3210
 
 # heat capacity Jkg-1K-1
-cp_s = 1592
-cp_b = 1200
-cp_g = 1e-4
-cp_p = 750
 
 # thermal conductivity W/m-1K-1
-k_s = 150
-k_b = 279
-k_g = 1e-4
-k_p = 380 #120 and 490
 
 # reaction type
-Ea = 21191.61425 # 177820 # J mol-1
-A = 0.0421047 # 5.24e12 # s-1
-R = 8.31446261815324 # JK-1mol-1
-hrp = 1.58e5 # J kg-1
 
-Y = 0.575
-order = 1.0
 
 # models
-pyro_mu = 0.015 # wgcp vs wg
-zeta = 0.03 # phiop vs wbdot
 rho_g = 13 #kgm-3
 
 # initial condition
@@ -65,11 +49,8 @@ dTdtcool = '${fparse (Tmax-T0)/(tcool*3600)}' #Ks-1
 total_time = '${fparse theat + tcool*3600}'
 
 #### stress-strain ####
-E = 400e9
 
 # thermal expansion coefficients (degree-1)
-Tref = 300 #K
-g = 4e-6
 
 #boundary conditions
 htc = 200 #Wm-2K assume air doesnt move much
@@ -149,48 +130,14 @@ htc = 200 #Wm-2K assume air doesnt move much
 []
 
 [NEML2]
-    input = 'neml2/neml2_material.i'
-    cli_args = 'rho_s=${rho_s} rho_b=${rho_b} rho_g=${rho_g} rho_p=${rho_p} Mref=${Mref}
-                rho_sm1M=${fparse Mref/rho_s} rho_bm1M=${fparse Mref/rho_b}
-                rho_gm1M=${fparse Mref/rho_g} rho_pm1M=${fparse Mref/rho_p}
-                cp_s=${cp_s} cp_b=${cp_b} cp_g=${cp_g} cp_p=${cp_p}
-                k_s=${k_s} k_b=${k_b} k_g=${k_g} k_p=${k_p}
-                Ea=${Ea} A=${A} R=${R} mY=${fparse -Y}
-                order=${order} source_coeff=${fparse -rho_s*hrp}
-                mu=${pyro_mu} mzeta=${fparse -zeta}
-                ws0=${ws0} wb0=${wb0} E=${E} g=${g} E=${E} Tref=${Tref}'
+    input = '../../../../neml2_models/aoti/pyrolysis_2d/model_aoti.i'
     [all]
         model = 'model'
         verbose = true
         device = 'cpu'
 
-        moose_input_types = 'VARIABLE     POSTPROCESSOR POSTPROCESSOR   MATERIAL        MATERIAL
-                             MATERIAL     MATERIAL      MATERIAL        MATERIAL        MATERIAL'
-        moose_inputs = '     T            time          time            alpha           alpha
-                             wb           ws            wgcp            phiop           deformation_gradient'
-        neml2_inputs = '     forces/T     forces/t      old_forces/t    old_state/alpha state/alpha
-                             old_state/wb old_state/ws  old_state/wgcp  old_state/phiop forces/F'
-
-        moose_parameter_types = 'MATERIAL        MATERIAL        MATERIAL'
-        moose_parameters = '     wp              mwb0            o_Vref'
-        neml2_parameters = '     wp_state_param  binder_rate_c_0 Jvolume_c_0'
-
-        moose_output_types = 'MATERIAL        MATERIAL   MATERIAL   MATERIAL     MATERIAL
-                              MATERIAL        MATERIAL   MATERIAL   MATERIAL     MATERIAL
-                              MATERIAL        MATERIAL   MATERIAL   MATERIAL     MATERIAL'
-        moose_outputs = '     phiop           wb         ws         wgcp         pk1_stress
-                              phib            phip       phis       phigcp       alpha
-                              M3              M2         M1         Jt           Jv'
-        neml2_outputs = '     state/phiop     state/wb   state/ws   state/wgcp   state/pk1
-                              state/phib      state/phip state/phis state/phigcp state/alpha
-                              state/M3        state/M2   state/M1   state/Jt     state/Jv'
-
-        moose_derivative_types = 'MATERIAL            MATERIAL              MATERIAL
-                                  MATERIAL            MATERIAL'
-        moose_derivatives = '     dM3dT               dM1dT                 dM2dT
-                                  dpk1dT              pk1_jacobian'
-        neml2_derivatives = '     state/M3 forces/T;  state/M1 forces/T;    state/M2 forces/T;
-                                  state/pk1 forces/T; state/pk1 forces/F'
+        derivatives = 'M3 T dM3dT; M1 T dM1dT; M2 T dM2dT;
+                       pk1_stress T dpk1dT; pk1_stress deformation_gradient pk1_jacobian'
 
         initialize_outputs = '      wb  wgcp  ws  alpha  phiop'
         initialize_output_values = 'wb0 wgcp0 ws0 alpha0 phiop0'

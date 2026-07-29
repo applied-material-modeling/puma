@@ -1,169 +1,173 @@
-[Settings]
-    additional_libraries = 'neml2/puma_custom_neml2'
-[]
+# Bare-name constants (driver overwrites at runtime; values only need to be
+# valid floats for compilation). This turbine PIP infiltration model is the
+# simpler variant: no fluid swelling Jacobian (Jf), no advective/induced stress,
+# Jt is the thermal Jacobian directly, and the L2 pressure term uses only the
+# capillary pressure Pc.
+rho_f = 1250.0
+Tref = 300.0
+therm_expansion = 1e-06
+kk_L = 2e-05
+permeability_power = 8
+rhof_nu = 125.0
+hf_rhof_nu = 0.0
+rhof2_nu = 156250.0
+hf_rhof2_nu = 0.0
+brooks_corey_threshold = 30000.0
+capillary_pressure_power = 8
 
 [Models]
     ## solid mechanics ----------------------------------------------------------
     [Jacobian]
         type = R2Determinant
-        input = 'forces/F'
-        determinant = 'state/J'
+        input = 'deformation_gradient'
+        determinant = 'J'
     []
     [M1]
         type = ScalarLinearCombination
-        coefficients = "${rho_f}"
-        from_var = 'state/J'
-        to_var = 'state/M1'
+        weights = "${rho_f}"
+        from = 'J'
+        to = 'M1'
     []
     # thermal add-on ###########
+    # Jt is the thermal deformation Jacobian directly (no fluid Jacobian Jf).
     [Fthermal]
         type = ThermalDeformationJacobian
-        temperature = 'forces/T'
+        temperature = 'T'
         reference_temperature = ${Tref}
         CTE = ${therm_expansion}
-        jacobian = 'state/Jt'
+        jacobian = 'Jt'
     []
-    [V]
-        type = ScalarParameterToState
-        from = 1.0
-        to = 'state/V'
-    []
+    # Jv = V * o_Vref (current composite volume / reference volume).
     [Jvolume]
-        type = ScalarLinearCombination
-        from_var = 'state/V'
-        coefficients = '1.0'
-        coefficient_as_parameter = true
-        to_var = 'state/Jv'
+        type = ScalarMultiplication
+        from = 'V o_Vref'
+        to = 'Jv'
     []
     # -----------------------------
     [Jtotal]
         type = ScalarMultiplication
-        from_var = 'state/Jt state/Jf state/Jv'
-        to_var = 'state/Jtotal'
+        from = 'Jt Jv'
+        to = 'Jtotal'
     []
     [totalF]
         type = VolumeAdjustDeformationGradient
-        input = 'forces/F'
-        output = 'state/Fe'
-        jacobian = 'state/Jtotal'
+        input = 'deformation_gradient'
+        output = 'Fe'
+        jacobian = 'Jtotal'
     []
     ########
     [green_strain]
         type = GreenLagrangeStrain
-        deformation_gradient = 'state/Fe'
-        strain = 'state/Ee'
+        deformation_gradient = 'Fe'
+        strain = 'Ee'
     []
     [S_pk2]
         type = LinearIsotropicElasticity
-        strain = 'state/Ee'
-        stress = 'state/pk2_SR2'
+        strain = 'Ee'
+        stress = 'pk2_SR2'
         coefficients = '1000 0.3'
         coefficient_types = 'YOUNGS_MODULUS POISSONS_RATIO'
     []
     [S_pk2_R2]
-        type = SR2toR2
-        input = 'state/pk2_SR2'
-        output = 'state/pk2'
+        type = SR2ToR2
+        input = 'pk2_SR2'
+        output = 'pk2_stress'
     []
     [S_pk1]
         type = R2Multiplication
-        A = 'forces/F'
-        B = 'state/pk2'
-        to = 'state/pk1'
+        A = 'deformation_gradient'
+        B = 'pk2_stress'
+        to = 'pk1_stress'
         invert_B = false
     []
     [model_pk1]
         type = ComposedModel
-        models = 'V Jtotal Jvolume
+        models = 'Jtotal Jvolume
                   Fthermal totalF green_strain S_pk2 S_pk2_R2 S_pk1'
-        additional_outputs = 'state/Jt state/Jv state/pk2'
+        additional_outputs = 'Jt Jv pk2_stress'
     []
     [model_sm]
         type = ComposedModel
         models = 'Jacobian M1 model_pk1'
     []
-    #################################################################
     ## porous flow -----------------------------------------------------------------
-    [phif_max]
-        type = ScalarParameterToState
-        from = 1.0
-        to = 'state/phif_max'
-    []
+    # phif_max is a bare gathered input (spatial void from MOOSE), not a constant.
     [permeability]
         type = PowerLawPermeability
         reference_permeability = ${kk_L}
         reference_porosity = 0.9
         exponent = ${permeability_power}
-        porosity = 'state/phif_max'
-        permeability = 'state/perm'
+        porosity = 'phif_max'
+        permeability = 'perm'
     []
     [M3]
         type = ScalarLinearCombination
-        coefficients = "${rhof_nu}"
-        from_var = 'state/perm'
-        to_var = 'state/M3'
+        weights = "${rhof_nu}"
+        from = 'perm'
+        to = 'M3'
     []
     [M8]
         type = ScalarLinearCombination
-        coefficients = "${hf_rhof_nu}"
-        from_var = 'state/perm'
-        to_var = 'state/M8'
+        weights = "${hf_rhof_nu}"
+        from = 'perm'
+        to = 'M8'
     []
     [M4]
         type = ScalarMultiplication
-        coefficient = "${rhof2_nu}"
-        from_var = 'state/perm state/Seff'
-        to_var = 'state/M4'
+        scaling = "${rhof2_nu}"
+        from = 'perm Seff'
+        to = 'M4'
     []
     [M9]
         type = ScalarLinearCombination
-        coefficients = "${hf_rhof2_nu}"
-        from_var = 'state/perm state/Seff'
-        to_var = 'state/M9'
+        weights = "${hf_rhof2_nu}"
+        from = 'perm Seff'
+        to = 'M9'
     []
     [effective_saturation]
         type = EffectiveSaturationSecondOrder
         residual_saturation = 0.0
-        fluid_fraction = 'forces/phif'
-        max_fraction = 'state/phif_max'
-        effective_saturation = 'state/Seff'
+        fluid_fraction = 'phif'
+        max_fraction = 'phif_max'
+        effective_saturation = 'Seff'
     []
     [capillary_pressure]
         type = BrooksCoreyCapillaryPressure
         threshold_pressure = '${brooks_corey_threshold}'
         exponent = '${capillary_pressure_power}'
-        effective_saturation = 'state/Seff'
-        capillary_pressure = 'state/Pc'
+        effective_saturation = 'Seff'
+        capillary_pressure = 'Pc'
         log_extension = true
         transition_saturation = 0.001
     []
     [M5]
         type = ScalarLinearCombination
-        from_var = 'state/Pc'
-        to_var = 'state/M5'
-        coefficients = '-1.0'
+        from = 'Pc'
+        to = 'M5'
+        weights = '-1.0'
     []
     [empty_porosity]
         type = ScalarLinearCombination
-        from_var = 'state/phif_max forces/phif'
-        to_var = 'state/poro'
-        coefficients = '1.0 -1.0'
+        from = 'phif_max phif'
+        to = 'poro'
+        weights = '1.0 -1.0'
     []
     [solid_fraction]
         type = ScalarLinearCombination
-        from_var = 'state/phif_max'
-        to_var = 'state/solid'
-        constant_coefficient = 1.0
-        coefficients = '-1.0'
+        from = 'phif_max'
+        to = 'phis'
+        offset = 1.0
+        weights = '-1.0'
     []
     [model_porousflow]
         type = ComposedModel
-        models = 'solid_fraction empty_porosity phif_max permeability
+        models = 'solid_fraction empty_porosity permeability
                     effective_saturation capillary_pressure M3 M4 M5 M8 M9'
-        additional_outputs = 'state/perm'
+        additional_outputs = 'perm'
     []
     [model]
         type = ComposedModel
         models = 'model_sm model_porousflow'
+        additional_outputs = 'pk1_stress'
     []
 []

@@ -1,63 +1,75 @@
-# reaction mechanism
-Y = 0.5835777126099713 # yield
-n = 1.0 # reaction order
-k0 = 0.04210147513030456 # reaction rate coefficient
-Q = 21191.61425138572 # J/mol
-R = 8.31446261815324 # J/K/mol
- 
+Y = 0.5835777126099713
+n = 1.0
+k0 = 0.04210147513030456
+Q = 21191.61425138572
+R = 8.31446261815324
+
+[Solvers]
+  [newton]
+    type = Newton
+    verbose = false
+    linear_solver = 'lu'
+  []
+  [lu]
+    type = DenseLU
+  []
+[]
+
+[EquationSystems]
+  [eq_sys]
+    type = NonlinearSystem
+    model = 'residual'
+    unknowns = 'alpha wb wc'
+    residuals = 'alpha_residual wb_residual wc_residual'
+  []
+[]
+
 [Models]
   [reaction_coef]
     type = ArrheniusParameter
     reference_value = '${k0}'
     activation_energy = '${Q}'
     ideal_gas_constant = '${R}'
-    temperature = 'forces/T'
-    parameter = 'state/k'
+    temperature = 'T'
+    parameter = 'k'
   []
   [reaction_rate]
     type = ContractingGeometry
-    reaction_coef = 'reaction_coef'
-    reaction_order = '${n}'
-    conversion_degree = 'state/alpha'
-    reaction_rate = 'state/alpha_rate'
-  []
-  [reaction_ode]
-    type = ScalarBackwardEulerTimeIntegration
-    variable = 'state/alpha'
-  []
-  [reaction]
-    type = ComposedModel
-    models = 'reaction_rate reaction_ode'
-  []
-  [solve_reaction]
-    type = ImplicitUpdate
-    implicit_model = 'reaction'
-    solver = 'newton'
+    coef = 'k'
+    order = '${n}'
+    conversion_degree = 'alpha'
+    reaction_rate = 'alpha_rate'
   []
   [binder_rate]
     type = ScalarLinearCombination
-    from_var = 'state/alpha_rate'
-    coefficients = '-1'
-    to_var = 'state/wb_rate'
+    from = 'alpha_rate'
+    weights = '-1'
+    to = 'wb_rate'
   []
   [char_rate]
     type = ScalarLinearCombination
-    from_var = 'state/alpha_rate'
-    coefficients = '${Y}'
-    coefficient_as_parameter = 'true'
-    to_var = 'state/wc_rate'
+    from = 'alpha_rate'
+    weights = '${Y}'
+    to = 'wc_rate'
+  []
+  [reaction_ode]
+    type = ScalarBackwardEulerTimeIntegration
+    variable = 'alpha'
+    time = 't'
   []
   [binder]
     type = ScalarBackwardEulerTimeIntegration
-    variable = 'state/wb'
+    variable = 'wb'
+    time = 't'
   []
   [char]
     type = ScalarBackwardEulerTimeIntegration
-    variable = 'state/wc'
+    variable = 'wc'
+    time = 't'
   []
-  [model]
+  [residual]
     type = ComposedModel
-    models = "reaction_rate reaction char_rate binder_rate
-    binder char"
+    models = 'reaction_coef reaction_rate binder_rate char_rate
+              reaction_ode binder char'
   []
 []

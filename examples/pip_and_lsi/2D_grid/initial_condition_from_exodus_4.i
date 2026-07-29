@@ -9,15 +9,17 @@
 []
 
 [AuxVariables]
-    [phis]
+    # Named *_pyro so they collide with neither the NEML2 reactive_flow output
+    # materials (phis/phip) nor infiltration_lsi.i's display aux (phi_C/phi_SiC).
+    [phis_pyro]
         order = CONSTANT
         family = MONOMIAL
     []
-    [phip]
+    [phip_pyro]
         order = CONSTANT
         family = MONOMIAL
     []
-    [phigcp]
+    [phigcp_pyro]
         order = CONSTANT
         family = MONOMIAL
     []
@@ -32,23 +34,23 @@
 []
 
 [ICs]
-    [phis]
+    [phis_pyro]
         type = SolutionIC
         from_variable = phis
         solution_uo = reader_object2
-        variable = phis
+        variable = phis_pyro
     []
-    [phip]
+    [phip_pyro]
         type = SolutionIC
         from_variable = phip
         solution_uo = reader_object2
-        variable = phip
+        variable = phip_pyro
     []
-    [phigcp]
+    [phigcp_pyro]
         type = SolutionIC
         from_variable = phigcp
         solution_uo = reader_object2
-        variable = phigcp
+        variable = phigcp_pyro
     []
     [o_Vref]
         type = SolutionIC
@@ -68,14 +70,14 @@
     [init_phiC0]
         type = ParsedMaterial
         property_name = phi0_C
-        expression = 'phis'
-        coupled_variables = 'phis'
+        expression = 'phis_pyro'
+        coupled_variables = 'phis_pyro'
     []
     [init_phiSiC0_noreact]
         type = ParsedMaterial
         property_name = phi0SiC_noreact
-        expression = 'phip + phigcp'
-        coupled_variables = 'phigcp phip'
+        expression = 'phip_pyro + phigcp_pyro'
+        coupled_variables = 'phigcp_pyro phip_pyro'
     []
     [init_o_Vref]
         type = ParsedMaterial

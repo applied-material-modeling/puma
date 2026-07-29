@@ -1,3 +1,33 @@
+A = 0.0421047
+Ea = 21191.61425
+R = 8.31446261815324
+order = 1.0
+mY = -0.575
+mu = 0.015
+mzeta = -0.03
+Mref = 18.0
+rho_s = 2100.0
+rho_b = 1250.0
+rho_p = 3210.0
+rho_g = 13.0
+rho_sm1M = 0.008571428571428572
+rho_bm1M = 0.0144
+rho_pm1M = 0.005607476635514018
+rho_gm1M = 1.3846153846153846
+cp_s = 1592.0
+cp_b = 1200.0
+cp_p = 750.0
+k_s = 150.0
+k_b = 279.0
+k_p = 380.0
+source_coeff = -331800000.0
+wp0 = 0.2777777777777778
+mwb0 = -0.5555555555555556
+E = 400000000000.0
+g = 4e-06
+Tref = 300.0
+o_Vref = 90.93222879364822
+
 [Solvers]
     [newton]
         type = Newton
@@ -13,6 +43,7 @@
     [eq_sys]
         type = NonlinearSystem
         model = 'reaction'
+        unknowns = 'alpha'
     []
 []
 
@@ -22,23 +53,24 @@
         reference_value = '${A}'
         activation_energy = '${Ea}'
         ideal_gas_constant = '${R}'
-        temperature = 'forces/T'
-        parameter = 'state/k'
+        temperature = 'T'
+        parameter = 'k'
     []
     [reaction_rate]
         type = ContractingGeometry
-        reaction_coef = 'reaction_coef'
-        reaction_order = '${order}'
-        conversion_degree = 'state/alpha'
-        reaction_rate = 'state/alpha_rate'
+        coef = 'k'
+        order = '${order}'
+        conversion_degree = 'alpha'
+        reaction_rate = 'alpha_rate'
     []
     [reaction_ode]
         type = ScalarBackwardEulerTimeIntegration
-        variable = 'state/alpha'
+        variable = 'alpha'
+        time = 't'
     []
     [reaction]
         type = ComposedModel
-        models = 'reaction_rate reaction_ode'
+        models = 'reaction_coef reaction_rate reaction_ode'
     []
     [solve_reaction]
         type = ImplicitUpdate
@@ -47,207 +79,198 @@
     []
     [binder_rate]
         type = ScalarLinearCombination
-        from_var = 'state/alpha_rate'
-        coefficients = 0.0
-        coefficient_as_parameter = true
-        to_var = 'state/wb_rate'
+        from = 'alpha_rate'
+        weights = '${mwb0}'
+        to = 'wb_rate'
     []
     [char_rate]
         type = ScalarLinearCombination
-        from_var = 'state/wb_rate'
-        coefficients = '${mY}'
-        to_var = 'state/ws_rate'
+        from = 'wb_rate'
+        weights = '${mY}'
+        to = 'ws_rate'
     []
     [gas_rate]
         type = ScalarLinearCombination
-        from_var = 'state/wb_rate state/ws_rate'
-        coefficients = '-${mu} -${mu}'
-        to_var = 'state/wgcp_rate'
+        from = 'wb_rate ws_rate'
+        weights = '-${mu} -${mu}'
+        to = 'wgcp_rate'
     []
     [open_pore_rate]
         type = ScalarLinearCombination
-        from_var = 'state/wb_rate'
-        coefficients = '${mzeta}'
-        to_var = 'state/phiop_rate'
+        from = 'wb_rate'
+        weights = '${mzeta}'
+        to = 'phiop_rate'
     []
     [binder]
         type = ScalarForwardEulerTimeIntegration
-        variable = 'state/wb'
+        variable = 'wb'
+        time = 't'
     []
     [char]
         type = ScalarForwardEulerTimeIntegration
-        variable = 'state/ws'
+        variable = 'ws'
+        time = 't'
     []
     [gas]
         type = ScalarForwardEulerTimeIntegration
-        variable = 'state/wgcp'
+        variable = 'wgcp'
+        time = 't'
     []
     [open_pore]
         type = ScalarForwardEulerTimeIntegration
-        variable = 'state/phiop'
+        variable = 'phiop'
+        time = 't'
     []
     [model_solver]
         type = ComposedModel
-        models = "solve_reaction reaction_rate
+        models = "solve_reaction reaction_coef reaction_rate
                 binder_rate char_rate gas_rate open_pore_rate
                 binder char gas open_pore"
-        additional_outputs = 'state/alpha'
+        additional_outputs = 'alpha k'
     []
-    ################################### POST PROCESS #################################
-    #########
-    ############### volume fraction ######
     [wp_state]
-        type = ScalarParameterToState
-        from = 0.0
-        to = 'state/wp'
+        type = ScalarParameterToVariable
+        from = '${wp0}'
+        to = 'wp'
     []
     [V_RVE_post]
         type = EffectiveVolume
         reference_mass = '${Mref}'
-        mass_fractions = 'state/wb state/ws state/wp state/wgcp'
+        mass_fractions = 'wb ws wp wgcp'
         densities = '${rho_b} ${rho_s} ${rho_p} ${rho_g}'
-        open_volume_fraction = 'state/phiop'
-        composite_volume = 'state/V'
+        open_volume_fraction = 'phiop'
+        composite_volume = 'V'
     []
     [phi_b]
         type = ScalarMultiplication
-        from_var = 'state/wb state/V'
-        coefficient = '${rho_bm1M}'
-        to_var = 'state/phib'
+        from = 'wb V'
+        scaling = '${rho_bm1M}'
+        to = 'phib'
         reciprocal = 'false true'
     []
     [phi_s]
         type = ScalarMultiplication
-        from_var = 'state/ws state/V'
-        coefficient = '${rho_sm1M}'
-        to_var = 'state/phis'
+        from = 'ws V'
+        scaling = '${rho_sm1M}'
+        to = 'phis'
         reciprocal = 'false true'
     []
     [phi_p]
         type = ScalarMultiplication
-        from_var = 'state/wp state/V'
-        coefficient = '${rho_pm1M}'
-        to_var = 'state/phip'
+        from = 'wp V'
+        scaling = '${rho_pm1M}'
+        to = 'phip'
         reciprocal = 'false true'
     []
     [phi_gcp]
         type = ScalarMultiplication
-        from_var = 'state/wgcp state/V'
-        coefficient = '${rho_gm1M}'
-        to_var = 'state/phigcp'
+        from = 'wgcp V'
+        scaling = '${rho_gm1M}'
+        to = 'phigcp'
         reciprocal = 'false true'
     []
     [phi_out]
         type = ComposedModel
         models = 'V_RVE_post phi_b phi_s phi_p phi_gcp'
-        additional_outputs = 'state/V'
+        additional_outputs = 'V'
     []
-    #########
-    ######### element properties
     [rho]
         type = ScalarLinearCombination
-        coefficients = '${rho_p} ${rho_b} ${rho_s}'
-        from_var = 'state/phip state/phib state/phis'
-        to_var = 'state/rho'
+        weights = '${rho_p} ${rho_b} ${rho_s}'
+        from = 'phip phib phis'
+        to = 'rho'
     []
     [cp]
         type = ScalarLinearCombination
-        coefficients = '${cp_p} ${cp_b} ${cp_s}'
-        from_var = 'state/wp state/wb state/ws'
-        to_var = 'state/cp'
+        weights = '${cp_p} ${cp_b} ${cp_s}'
+        from = 'wp wb ws'
+        to = 'cp'
     []
     [rhocp]
         type = ScalarMultiplication
-        from_var = 'state/rho state/cp'
-        to_var = 'state/M1'
+        from = 'rho cp'
+        to = 'M1'
     []
     [K]
         type = ScalarLinearCombination
-        coefficients = '${k_p} ${k_b} ${k_s}'
-        from_var = 'state/phip state/phib state/phis'
-        to_var = 'state/M2'
+        weights = '${k_p} ${k_b} ${k_s}'
+        from = 'phip phib phis'
+        to = 'M2'
     []
     [reaction_rate_new]
         type = ContractingGeometry
-        reaction_coef = 'reaction_coef'
-        reaction_order = '${order}'
-        conversion_degree = 'state/alpha'
-        reaction_rate = 'state/alpha_rate'
+        coef = 'k'
+        order = '${order}'
+        conversion_degree = 'alpha'
+        reaction_rate = 'alpha_rate_post'
     []
     [heat_generation]
         type = ScalarLinearCombination
-        from_var = 'state/alpha_rate'
-        coefficients = '${source_coeff}'
-        to_var = 'state/M3'
+        from = 'alpha_rate_post'
+        weights = '${source_coeff}'
+        to = 'M3'
     []
     [elout]
         type = ComposedModel
-        models = 'wp_state reaction_rate_new phi_out rho cp rhocp K heat_generation'
-        additional_outputs = 'state/phib state/phip state/phis'
+        models = 'reaction_rate_new phi_out wp_state rho cp rhocp K heat_generation'
+        additional_outputs = 'phib phip phis'
     []
-    ## solid mechanics ----------------------------------------------------------
     [Jthermal]
         type = ThermalDeformationJacobian
-        temperature = 'forces/T'
-        reference_temperature = ${Tref}
-        CTE = ${g}
-        jacobian = 'state/Jt'
+        temperature = 'T'
+        reference_temperature = '${Tref}'
+        CTE = '${g}'
+        jacobian = 'Jt'
     []
     [Jvolume]
         type = ScalarLinearCombination
-        from_var = 'state/V'
-        coefficients = '1.0'
-        coefficient_as_parameter = true
-        to_var = 'state/Jv'
+        from = 'V'
+        weights = '${o_Vref}'
+        to = 'Jv'
     []
-    # -----------------------------
     [Jtotal]
         type = ScalarMultiplication
-        from_var = 'state/Jt state/Jv'
-        to_var = 'state/Jtotal'
+        from = 'Jt Jv'
+        to = 'Jtotal'
     []
     [totalF]
         type = VolumeAdjustDeformationGradient
-        input = 'forces/F'
-        output = 'state/Fe'
-        jacobian = 'state/Jtotal'
+        input = 'deformation_gradient'
+        output = 'Fe'
+        jacobian = 'Jtotal'
     []
-    ########
     [green_strain]
         type = GreenLagrangeStrain
-        deformation_gradient = 'state/Fe'
-        strain = 'state/Ee'
+        deformation_gradient = 'Fe'
+        strain = 'Ee'
     []
     [S_pk2]
         type = LinearIsotropicElasticity
-        strain = 'state/Ee'
-        stress = 'state/pk2_SR2'
+        strain = 'Ee'
+        stress = 'pk2_SR2'
         coefficients = '${E} 0.3'
         coefficient_types = 'YOUNGS_MODULUS POISSONS_RATIO'
     []
     [S_pk2_R2]
-        type = SR2toR2
-        input = 'state/pk2_SR2'
-        output = 'state/pk2'
+        type = SR2ToR2
+        input = 'pk2_SR2'
+        output = 'pk2'
     []
     [S_pk1]
         type = R2Multiplication
-        A = 'forces/F'
-        B = 'state/pk2'
-        to = 'state/pk1'
+        A = 'deformation_gradient'
+        B = 'pk2'
+        to = 'pk1_stress'
         invert_B = false
     []
     [model_sm]
         type = ComposedModel
-        models = ' Jtotal Jvolume
-                  Jthermal totalF green_strain S_pk2 S_pk2_R2 S_pk1'
-        additional_outputs = 'state/Jv state/Jt'
+        models = 'Jtotal Jvolume Jthermal totalF green_strain S_pk2 S_pk2_R2 S_pk1'
+        additional_outputs = 'Jv Jt'
     []
-    #######################################################################################
     [model]
         type = ComposedModel
         models = 'model_solver elout model_sm'
-        additional_outputs = 'state/phiop state/alpha state/wb state/ws state/wgcp'
+        additional_outputs = 'phiop alpha wb ws wgcp phib phip phis phigcp Jt Jv'
     []
-    #######################################################################################
 []

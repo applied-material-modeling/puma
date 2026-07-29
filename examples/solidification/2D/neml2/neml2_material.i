@@ -1,92 +1,99 @@
-[Settings]
-  additional_libraries = 'neml2/puma_custom_neml2'
-[]
+cp_rhofl = 17990000.0          # cp_Si*rho_Si
+cp_rhofs = 11850000.0          # cp_Si_s*rho_Si_s
+cp_rhos = 33900000.0           # cp_C*rho_C
+cp_rhop = 17655000.0           # cp_SiC*rho_SiC
+kap_fl = 14000000.0            # kappa_Si
+kap_fs = 14000000.0            # kappa_Si_s
+kap_s = 300000000.0            # kappa_C
+kap_p = 30000000.0             # kappa_SiC
+Ts = 1687
+Tl = 1707                      # Tf
+inv_1pdw = 0.9221789883268482  # 1/(1+delta_Omega) = rho_Si_s/rho_Si = 2.37/2.57
+one_plus_dw = 1.0843881856540084  # 1+delta_Omega = rho_Si/rho_Si_s
+neg_inv_1pdw = -0.9221789883268482 # -1/(1+delta_Omega)
+mOfs_Ofl = -1.0843881856540084 # -omega_Si_s/omega_Si_l = -(rho_Si/rho_Si_s)
+brooks_corey_threshold = 10000.0
+capillary_pressure_power = 10
+kk_L = 1e-8                    # kk_Si
+permeability_power = 8
+rho_f = 2.57                   # rho_Si
+rhof_nu = 257.0               # rho_Si/mu_Si
+rhof2_nu = 660.49             # rho_Si^2/mu_Si
+hf_rhof_onu = 4600300000000.0  # H_latent*rho_Si/mu_Si  (H_latent=1.79e10 erg/g, physical L_Si)
+hf_rhof2_onu = 11822771000000.0 # H_latent*rho_Si^2/mu_Si
+mhf_rhof = -46003000000.0      # -H_latent*rho_Si
+therm_expansion = 1e-6
+T0 = 300
+Tmax = 1720
+E = 400e9
+E_fs = 160e9                   # E_Si
+E_m = 400e9                    # E_C
+nu_fs = 0.3                    # nu_Si
+nu_m = 0.3                     # nu_C
+delta_Omega = 0.08438818565400843  # omega_Si_s/omega_Si_l - 1
 
 [Models]
-    ## Shared models among different sub-models
     [Jacobian]
         type = R2Determinant
-        input = 'forces/F'
-        determinant = 'state/J'
+        input = 'deformation_gradient'
+        determinant = 'J'
     []
-    [phip]
-        type = ScalarParameterToState
-        from = 1.0
-        to = 'state/phip'
-    []
-    [phis]
-        type = ScalarParameterToState
-        from = 1.0
-        to = 'state/phis'
-    []
-
-    ## matrix
     [phisp_premodel]
         type = ScalarLinearCombination
-        from_var = 'state/phis state/phip'
-        to_var = 'state/phi_sp'
-        coefficients = '1.0 1.0'
+        from = 'phis phip'
+        to = 'phi_sp'
+        weights = '1.0 1.0'
     []
     [phisp]
         type = ComposedModel
-        models = 'phisp_premodel phis phip'
+        models = 'phisp_premodel'
     []
-
-    ## Seff
     [effective_saturation_premodel]
         type = EffectiveSaturationSecondOrder
         residual_saturation = 0.0
-        fluid_fraction = 'forces/phif'
-        max_fraction = 'state/phif_max'
-        effective_saturation = 'state/Seff'
+        fluid_fraction = 'phif'
+        max_fraction = 'phif_max'
+        effective_saturation = 'Seff'
     []
     [effective_saturation]
         type = ComposedModel
         models = 'phif_max effective_saturation_premodel'
     []
-
-    ## rhocp
     [rhocp_premodel]
         type = ScalarLinearCombination
-        from_var = 'forces/phif state/phif_s state/phis state/phip'
-        to_var = 'state/rhocp'
-        coefficients = '${cp_rhofl} ${cp_rhofs} ${cp_rhos} ${cp_rhop}'
+        from = 'phif phif_s phis phip'
+        to = 'rhocp'
+        weights = '${cp_rhofl} ${cp_rhofs} ${cp_rhos} ${cp_rhop}'
     []
     [rhocp]
         type = ComposedModel
-        models = 'rhocp_premodel phif_s phis phip'
+        models = 'rhocp_premodel phif_s'
     []
-
-    ## kappa_eff
     [kappa_eff_premodel]
         type = ScalarLinearCombination
-        from_var = 'forces/phif state/phif_s state/phis state/phip'
-        to_var = 'state/kappa_eff'
-        coefficients = '${kap_fl} ${kap_fs} ${kap_s} ${kap_p}'
+        from = 'phif phif_s phis phip'
+        to = 'kappa_eff'
+        weights = '${kap_fl} ${kap_fs} ${kap_s} ${kap_p}'
     []
     [kappa_eff]
         type = ComposedModel
-        models = 'kappa_eff_premodel phif_s phis phip'
+        models = 'kappa_eff_premodel phif_s'
     []
-
-    ## phif_max
     [phif_max_premodel]
         type = ScalarLinearCombination
-        from_var = 'state/phis state/phip state/phif_s'
-        to_var = 'state/phif_max'
-        coefficients = '-1.0 -1.0 -1.0'
-        constant_coefficient = 1.0
+        from = 'phis phip phif_s'
+        to = 'phif_max'
+        weights = '-1.0 -1.0 -1.0'
+        offset = 1.0
     []
     [phif_max]
         type = ComposedModel
-        models = 'phis phip phif_s phif_max_premodel'
+        models = 'phif_s phif_max_premodel'
     []
-
-    ## phifmax_switch
     [phif_max_switch_premodel]
         type = HermiteSmoothStep
-        argument = 'state/phif_max'
-        value = 'state/phif_max_switch'
+        argument = 'phif_max'
+        value = 'phif_max_switch'
         lower_bound = 0.001
         upper_bound = 0.1
     []
@@ -94,70 +101,65 @@
         type = ComposedModel
         models = 'phif_max_switch_premodel phif_max'
     []
-
-    ## solidification model - phifl_dot
-    [activation]
-        type = HermiteSmoothStep
-        argument = 'forces/T'
-        value = 'state/H'
-        lower_bound = '${Ts}'
-        upper_bound = '${Tl}'
-        complement = true
-    []
-    [shift_phif]
+    # --- lever kinetics as a rate; phif_s INTEGRATED (conservative, bounded) ---
+    #   phif_avail = phif + phif_s~1/(1+dOmega)      (conserved total Si, old phif_s)
+    #   phifl_dot  = phif_avail*(g(T^n)-g(T^{n-1}))/dt   (discrete lever liquid rate)
+    #   phifs_dot  = -(1+dOmega)*phifl_dot ; phif_s integrated by forward Euler.
+    # g-DIFFERENCE telescopes -> exact completion across [Ts,Tl]; outside it the
+    # rate is 0 -> phif_s bounded (no over-fill). phif_avail uses OLD phif_s, so a
+    # small O(dt) under-completion residual remains under transport (dt-refinable).
+    [phif_avail]
         type = ScalarLinearCombination
-        from_var = 'forces/phif'
-        to_var = 'state/shift_phif'
-        constant_coefficient = '${mphi_min}'
+        from = 'phif phif_s~1'
+        to = 'phif_avail'
+        weights = '1.0 ${inv_1pdw}'
     []
     [phifl_dot_premodel]
-        type = ScalarMultiplication
-        from_var = 'state/shift_phif state/H'
-        to_var = 'state/phifl_dot'
-        coefficient = '${m_solidification_rate}'
+        type = HermiteSolidificationRate
+        temperature = 'T'
+        time = 't'
+        available = 'phif_avail'
+        lower_bound = '${Ts}'
+        upper_bound = '${Tl}'
+        rate = 'phifl_dot'
     []
     [phifl_dot]
         type = ComposedModel
-        models = 'shift_phif activation phifl_dot_premodel'
+        models = 'phif_avail phifl_dot_premodel'
     []
-
-    ## phif_s
     [phifs_dot]
         type = ScalarLinearCombination
-        from_var = 'state/phifl_dot'
-        to_var = 'state/phifs_rate'
-        coefficients = '${mOfs_Ofl}'
+        from = 'phifl_dot'
+        to = 'phifs_rate'
+        weights = '${mOfs_Ofl}'
     []
     [phif_sout]
         type = ScalarForwardEulerTimeIntegration
-        variable = 'state/phif_s'
-        rate = 'state/phifs_rate'
+        variable = 'phif_s'
+        rate = 'phifs_rate'
+        time = 't'
     []
     [phif_s]
         type = ComposedModel
         models = 'phifl_dot phifs_dot phif_sout'
     []
-
-    ## nonliquid
     [nonliquid_premodel]
         type = ScalarLinearCombination
-        from_var = 'state/phif_max'
-        to_var = 'state/nonliquid'
-        coefficients = '-1.0'
-        constant_coefficient = 1.0
+        from = 'phif_max'
+        to = 'nonliquid'
+        weights = '-1.0'
+        offset = 1.0
     []
     [nonliquid]
         type = ComposedModel
         models = 'phif_max nonliquid_premodel'
     []
-
-    ## Permeability and capillary pressure
     [capillary_pressure]
         type = BrooksCoreyCapillaryPressure
         threshold_pressure = '${brooks_corey_threshold}'
         exponent = '${capillary_pressure_power}'
-        effective_saturation = 'state/Seff'
-        capillary_pressure = 'state/Pc'
+        effective_saturation = 'Seff'
+        capillary_pressure = 'Pc'
         log_extension = true
         transition_saturation = 0.05
     []
@@ -166,8 +168,8 @@
         reference_permeability = '${kk_L}'
         reference_porosity = 0.9
         exponent = '${permeability_power}'
-        porosity = 'state/phif_max'
-        permeability = 'state/perm'
+        porosity = 'phif_max'
+        permeability = 'perm'
     []
     [cap]
         type = ComposedModel
@@ -177,88 +179,80 @@
         type = ComposedModel
         models = 'permeability phif_max'
     []
-
-    ## Jtotal
-    # Jt
     [scale_therm_sp]
         type = ScalarMultiplication
-        from_var = 'state/phi_sp'
-        to_var = 'state/scale_therm_sp'
-        coefficient = '${therm_expansion}'
+        from = 'phi_sp'
+        to = 'scale_therm_sp'
+        scaling = '${therm_expansion}'
     []
     [Jt_sp]
         type = ThermalDeformationJacobian
-        temperature = 'forces/T'
+        temperature = 'T'
         reference_temperature = '${T0}'
-        CTE = 'state/scale_therm_sp'
-        jacobian = 'state/Jt_sp'
+        CTE = 'scale_therm_sp'
+        jacobian = 'Jt_sp'
     []
     [scale_therm_fs]
         type = ScalarMultiplication
-        from_var = 'state/phif_s'
-        to_var = 'state/scale_therm_fs'
-        coefficient = '${therm_expansion}'
+        from = 'phif_s'
+        to = 'scale_therm_fs'
+        scaling = '${therm_expansion}'
     []
     [Jt_fs]
         type = ThermalDeformationJacobian
-        temperature = 'forces/T'
+        temperature = 'T'
         reference_temperature = '${Tmax}'
-        CTE = 'state/scale_therm_fs'
-        jacobian = 'state/Jt_fs'
+        CTE = 'scale_therm_fs'
+        jacobian = 'Jt_fs'
     []
     [Jt]
         type = ScalarMultiplication
-        from_var = 'state/Jt_fs state/Jt_sp'
-        to_var = 'state/Jt'
+        from = 'Jt_fs Jt_sp'
+        to = 'Jt'
     []
     [Jtotal_premodel]
         type = ScalarMultiplication
-        from_var = 'state/Jt'
-        to_var = 'state/Jtotal'
+        from = 'Jt'
+        to = 'Jtotal'
     []
     [Jtotal]
         type = ComposedModel
         models = 'phisp scale_therm_sp Jt_sp scale_therm_fs Jt_fs
-         Jtotal_premodel Jt'
-        additional_outputs = 'state/Jt_sp state/Jt_fs state/Jt state/Jt_fs'
+         Jtotal_premodel Jt phif_s'
+        additional_outputs = 'Jt_sp Jt_fs Jt'
     []
-
-    ## stress-strain
     [totalF]
         type = VolumeAdjustDeformationGradient
-        input = 'forces/F'
-        output = 'state/Fe'
-        jacobian = 'state/Jtotal'
+        input = 'deformation_gradient'
+        output = 'Fe'
+        jacobian = 'Jtotal'
     []
     [green_strain]
         type = GreenLagrangeStrain
-        deformation_gradient = 'state/Fe'
-        strain = 'state/Ee'
+        deformation_gradient = 'Fe'
+        strain = 'Ee'
     []
-
-    ## elastic stress
     [S_pk2_e]
         type = LinearIsotropicElasticity
-        strain = 'state/Ee'
-        stress = 'state/pk2_e_SR2'
+        strain = 'Ee'
+        stress = 'pk2_e_SR2'
         coefficients = '${E} 0.3'
         coefficient_types = 'YOUNGS_MODULUS POISSONS_RATIO'
     []
     [S_pk2_e_R2]
-        type = SR2toR2
-        input = 'state/pk2_e_SR2'
-        output = 'state/pk2_e'
+        type = SR2ToR2
+        input = 'pk2_e_SR2'
+        output = 'pk2_e'
     []
-    ## hydrostatic RVE stress
-    [ee_vol]
-        type = SR2AverageVolumetric
-        input = 'state/Ee'
-        average_volumetric = 'state/Ee_ave_vol'
-    []
-    [zero_parameter]
-        type = ScalarParameterToState
-        from = 0.0
-        to = 'state/zero'
+    # Macroscopic volumetric strain imposed at the RVE outer boundary r=r_o,
+    # identified with the Jacobian-based macroscale dilation eps_v = J - 1
+    # (J = det F, total macroscale deformation gradient; from [Jacobian]).
+    [eps_v]
+        type = ScalarLinearCombination
+        from = 'J'
+        to = 'eps_v'
+        weights = '1.0'
+        offset = -1.0
     []
     [rve_sh]
         type = PhaseChangeRadialStress
@@ -267,102 +261,99 @@
         E_m = '${E_m}'
         nu_m = '${nu_m}'
         delta_Omega = '${delta_Omega}'
-        macroscopic_strain = 'state/Ee_ave_vol'
-        pore_pressure = 'state/zero'
-        matrix_volume_fraction = 'state/phi_sp'
-        new_phase_volume_fraction = 'state/phif_s'
-        hydrostatic_stress = 'state/rve_sh'
+        macroscopic_strain = 'eps_v'
+        pore_pressure = 'Pc'
+        matrix_volume_fraction = 'phi_sp'
+        new_phase_volume_fraction = 'phif_s'
+        hydrostatic_stress = 'rve_sh'
     []
     [S_pk2_h]
         type = PK2HydrostaticStress
-        hydrostatic_stress = 'state/rve_sh'
-        deformation_gradient = 'forces/F'
-        pk2_stress = 'state/pk2_sh'
+        hydrostatic_stress = 'rve_sh'
+        deformation_gradient = 'deformation_gradient'
+        pk2_stress = 'pk2_sh'
     []
     [S_pk2]
         type = R2LinearCombination
-        from_var = 'state/pk2_e state/pk2_sh'
-        to_var = 'state/pk2'
+        from = 'pk2_e pk2_sh'
+        to = 'pk2'
     []
-    ##
     [S_pk1]
         type = R2Multiplication
-        A = 'forces/F'
-        B = 'state/pk2'
-        to = 'state/pk1'
+        A = 'deformation_gradient'
+        B = 'pk2'
+        to = 'pk1_stress'
         invert_B = false
     []
     [model_sm]
         type = ComposedModel
-        models = 'Jtotal totalF green_strain phisp S_pk2_e S_pk2_e_R2
-                    ee_vol zero_parameter rve_sh S_pk2_h
-                    S_pk2 S_pk1'
+        models = 'Jacobian cap Jtotal totalF green_strain phisp S_pk2_e S_pk2_e_R2
+                    eps_v rve_sh S_pk2_h
+                    S_pk2 S_pk1 phif_s'
     []
-
-    ## MATERIAL OUTPUTS
     [M1]
         type = ScalarLinearCombination
-        coefficients = '${rho_f}'
-        from_var = 'state/J'
-        to_var = 'state/M1'
+        weights = '${rho_f}'
+        from = 'J'
+        to = 'M1'
     []
     [M3]
         type = ScalarMultiplication
-        coefficient = '${rhof_nu}'
-        from_var = 'state/perm state/phif_max_switch'
-        to_var = 'state/M3'
+        scaling = '${rhof_nu}'
+        from = 'perm phif_max_switch'
+        to = 'M3'
     []
     [M4]
         type = ScalarMultiplication
-        coefficient = '${rhof2_nu}'
-        from_var = 'state/perm state/phif_max_switch'
-        to_var = 'state/M4'
+        scaling = '${rhof2_nu}'
+        from = 'perm phif_max_switch'
+        to = 'M4'
     []
     [M5]
         type = ScalarMultiplication
-        from_var = 'state/phifl_dot'
-        to_var = 'state/M5'
-        coefficient = '${rho_f}'
+        from = 'phifl_dot'
+        to = 'M5'
+        scaling = '${rho_f}'
     []
     [M6]
         type = ScalarMultiplication
-        from_var = 'state/Pc state/phif_max_switch'
-        to_var = 'state/M6'
-        coefficient = '-1.0'
+        from = 'Pc phif_max_switch'
+        to = 'M6'
+        scaling = '-1.0'
     []
     [M7]
         type = ScalarMultiplication
-        from_var = 'state/J state/rhocp'
-        to_var = 'state/M7'
+        from = 'J rhocp'
+        to = 'M7'
     []
     [M8]
         type = ScalarLinearCombination
-        from_var = 'state/kappa_eff'
-        to_var = 'state/M8'
+        from = 'kappa_eff'
+        to = 'M8'
     []
     [M9]
         type = ScalarMultiplication
-        coefficient = '${hf_rhof_onu}'
-        from_var = 'state/perm state/phif_max_switch'
-        to_var = 'state/M9'
+        scaling = '${hf_rhof_onu}'
+        from = 'perm phif_max_switch'
+        to = 'M9'
     []
     [M10]
         type = ScalarMultiplication
-        coefficient = '${hf_rhof2_onu}'
-        from_var = 'state/perm state/phif_max_switch'
-        to_var = 'state/M10'
+        scaling = '${hf_rhof2_onu}'
+        from = 'perm phif_max_switch'
+        to = 'M10'
     []
     [M11]
         type = ScalarMultiplication
-        from_var = 'state/J state/phifl_dot'
-        to_var = 'state/M11'
-        coefficient = '${mhf_rhof}'
+        from = 'J phifl_dot'
+        to = 'M11'
+        scaling = '${mhf_rhof}'
     []
     [model]
         type = ComposedModel
         models = 'Jacobian phif_s perm cap rhocp kappa_eff phif_max
                     nonliquid phifl_dot phif_max_switch model_sm
                   M1 M3 M4 M5 M6 M7 M8 M9 M10 M11'
-        additional_outputs = 'state/phif_s state/perm'
+        additional_outputs = 'phif_s perm'
     []
 []

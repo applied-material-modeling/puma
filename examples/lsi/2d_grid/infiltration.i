@@ -82,21 +82,6 @@
 # 
 # gravity = 980.665
 
-##
-## Calculations
-D_bar = '${fparse D_LP/(l_c)}'
-
-omega_C = '${fparse M_C/rho_C}'
-omega_Si = '${fparse M_Si/rho_Si}'
-omega_SiC = '${fparse M_SiC/rho_SiC}'
-
-oCm1 = '${fparse 1/omega_C}'
-oSiCm1 = '${fparse 1/omega_SiC}'
-
-chem_ratio = '${fparse k_SiC/k_C}'
-
-new_scale = '${fparse (transition_saturation_back-transition_saturation_back_start)/2}'
-
 [GlobalParams]
   displacements = 'disp_x disp_y'
   pressure = P
@@ -301,95 +286,29 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
     family = MONOMIAL
     [AuxKernel]
       type = MaterialRealAux
-      property = reaction_rate
+      property = react_new
       execute_on = 'INITIAL TIMESTEP_END'
     []
   []
 []
 
 [NEML2]
-  input = 'neml2/neml2_reactive_flow.i'
-  cli_args = 'kk_L=${perm_ref} permeability_power=${permeability_power} rhof_nu=${fparse rho_Si/mu_Si}
-              rhof2_nu=${fparse rho_Si^2/mu_Si} phif_residual=${phi_L_residual} rho_f=${rho_Si}
-              brooks_corey_threshold=${brooks_corey_threshold} capillary_pressure_power=${capillary_pressure_power}
-              nu=${nu} hf_rhof_nu=${fparse hf*rho_Si/mu_Si}
-              oP_oL=${fparse omega_SiC/omega_Si}
-              hf_rhof2_nu=${fparse hf*rho_Si^2/mu_Si} therm_expansion=${therm_expansion} Tref=${T0}
-              omega_Si=${omega_Si} D=${D_bar} oSiCm1=${oSiCm1} oCm1=${oCm1}
-              chem_ratio=${chem_ratio} mchem_P=${fparse -k_SiC}
-              rhocp_Si=${fparse rho_Si*cp_Si} rhocp_SiC=${fparse rho_SiC*cp_SiC} rhocp_C=${fparse rho_C*cp_C}
-              E=${E} Dmacro=${D_macro}
-              K_nucl_growth=${fparse K_nucl_growth*l_c} mhcolc=${fparse -h_c/l_c} omega_SiC=${omega_SiC}
-              kap_C=${kappa_C} kap_SiC=${kappa_SiC} kap_Si=${kappa_Si}
-              new_scale=${new_scale} transition_saturation_back=${transition_saturation_back}
-              transition_saturation_back_start=${transition_saturation_back_start}
-              transition_saturation_front=${transition_saturation_front}
-              reactivity_upbound=${reactivity_upbound} reactivity_lowbound=${reactivity_lowbound}
-              delta_Dscale_front=${fparse D_macro_high-D_macro}
-              delta_Dscale_back=${fparse D_macro_low-D_macro}
-              '
+  input = 'neml2/aoti_reactive/model_aoti.i'
   [all]
     model = 'model'
     verbose = true
     device = 'cpu'
 
-    moose_input_types = 'POSTPROCESSOR POSTPROCESSOR  VARIABLE    VARIABLE       MATERIAL
-                         MATERIAL      MATERIAL       MATERIAL    MATERIAL       '
-    moose_inputs = '     time          time           phif        T              deformation_gradient
-                         phip          phip           phis        phis           '
-    neml2_inputs = '     forces/t      old_forces/t   forces/phif forces/T       forces/F
-                         state/phip    old_state/phip state/phis  old_state/phis'
+    derivatives = 'M1 deformation_gradient dM1dF;
+                   M2 phif dM2dphif; M3 phif dM3dphif; M4 phif dM4dphif;
+                   M5 phif dM5dphif; M6 phif dM6dphif;
+                   M7 phif dM7dphif; M7 deformation_gradient dM7dF; M8 phif dM8dphif;
+                   pk1_stress T dpk1dT; pk1_stress phif dpk1dphif;
+                   pk1_stress deformation_gradient pk1_jacobian;
+                   phis phif dphisdphif; phiptotal phif dphiptotaldphif'
 
-    moose_parameter_types = 'MATERIAL'
-    moose_parameters = '     phi0SiC_noreact'
-    neml2_parameters = '     phinoreact_param'
-
-    moose_output_types = 'MATERIAL       MATERIAL    MATERIAL       MATERIAL        MATERIAL    MATERIAL
-                          MATERIAL       MATERIAL    MATERIAL       MATERIAL        MATERIAL    MATERIAL
-                          MATERIAL       MATERIAL    MATERIAL       MATERIAL        MATERIAL    MATERIAL
-                          MATERIAL'
-    moose_outputs = '     pk1_stress     M1          M7             M3              M4          M6
-                          M2             phis        phip           pk2_stress      Pc          reaction_rate
-                          M5             M8          phif_max       phiptotal       Jt          Seff
-                          phiv'
-    neml2_outputs = '     state/pk1      state/M1    state/M7       state/M3        state/M4    state/M6
-                          state/M2       state/phis  state/phip     state/pk2       state/Pc    state/react_new
-                          state/M5       state/M8    state/phif_max state/phiptotal state/Jt    state/Seff
-                          state/phiv'
-
-    moose_derivative_types = '                                                MATERIAL
-                                                      MATERIAL
-                                                      MATERIAL
-                                                      MATERIAL
-                                                      MATERIAL
-                                                      MATERIAL
-                                                      MATERIAL                MATERIAL
-                                                      MATERIAL
-                                  MATERIAL            MATERIAL                MATERIAL
-                                                      MATERIAL                MATERIAL'
-    moose_derivatives = '                                                     dM1dF
-                                                      dM2dphif
-                                                      dM3dphif
-                                                      dM4dphif
-                                                      dM5dphif
-                                                      dM6dphif
-                                                      dM7dphif                dM7dF
-                                                      dM8dphif
-                                  dpk1dT              dpk1dphif               pk1_jacobian
-                                                      dphisdphif              dphiptotaldphif'
-    neml2_derivatives = '                                                     state/M1 forces/F;
-                                                      state/M2  forces/phif;
-                                                      state/M3  forces/phif;
-                                                      state/M4  forces/phif;
-                                                      state/M5  forces/phif;
-                                                      state/M6  forces/phif;
-                                                      state/M7  forces/phif;  state/M7 forces/F;
-                                                      state/M8  forces/phif;
-                                  state/pk1 forces/T; state/pk1 forces/phif;  state/pk1 forces/F;
-                                                      state/phis forces/phif; state/phiptotal forces/phif'
-
-    initialize_outputs = '      phip     phis   '
-    initialize_output_values = 'phi0_SiC phi0_C '
+    initialize_outputs = '      phip     phis'
+    initialize_output_values = 'phi0_SiC phi0_C'
   []
 []
 

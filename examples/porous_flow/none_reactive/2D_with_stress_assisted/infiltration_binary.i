@@ -9,38 +9,21 @@ flux_out = 0.1
 t_ramp = 1500
 t_displace = 200
 
-# denisty # g cm-3
-rho_PR = 2.00 # density at liquid state
-
-brooks_corey_threshold = 1e-1 #Pa
-capillary_pressure_power = 3
-phi_L_residual = 0.0
-
-permeability_power = 3
-
-# liquid viscosity
-mu_PR = 10
-
-# solid permeability
-kk_PR = 2e-5
-
-# macroscopic property
-D_macro = 0.001 #cm2 s-1
-
+# initial condition
 porosity_feature = 0.5
 porosity_background = 0.5
 
-E = 1000
-nu = 0.3
+gravity = 0
 
-E_feature = '${fparse E*porosity_feature}'
-E_background = '${fparse E*porosity_background}'
+# prescribed displacement
+displace_value_x = -0.25
+displace_value_y = -0.5
 
-swelling_coefficient = 0.1
+# constant flow coefficient (M2 = rho_PR * D_macro)
+rho_PR = 2.00
+D_macro = 0.001
 
-gravity = 0 # 980.665
-
-# --------------- Mesh BCs
+# node-set geometry for roll/fix/displace nodesets
 xroll = 10
 yroll = 0
 zroll = 0
@@ -51,8 +34,6 @@ xdisplace_low = 8
 xdisplace_high = 10
 ydisplace = 10
 zdisplace = 0
-displace_value_x = -0.25
-displace_value_y = -0.5
 
 [GlobalParams]
   displacements = 'disp_x disp_y'
@@ -209,34 +190,16 @@ displace_value_y = -0.5
 []
 
 [NEML2]
-  input = 'neml2/neml2_material.i'
-  cli_args = 'kk_L=${kk_PR} permeability_power=${permeability_power} rhof_nu=${fparse rho_PR/mu_PR}
-              rhof2_nu=${fparse rho_PR^2/mu_PR} phif_residual=${phi_L_residual} rho_f=${fparse rho_PR}
-              brooks_corey_threshold=${brooks_corey_threshold} capillary_pressure_power=${capillary_pressure_power}
-              nu=${nu} swelling_coefficient=${swelling_coefficient}'
+  input = 'neml2/aoti/model_aoti.i'
   [all]
     model = 'model'
     verbose = true
     device = 'cpu'
 
-    moose_input_types = 'VARIABLE    MATERIAL'
-    moose_inputs = '     phif        deformation_gradient'
-    neml2_inputs = '     forces/phif forces/F'
-
-    moose_parameter_types = 'MATERIAL       MATERIAL '
-    moose_parameters = '     void           E        '
-    neml2_parameters = '     phif_max_param S_pk2_E  '
-
-    moose_output_types = 'MATERIAL   MATERIAL MATERIAL MATERIAL MATERIAL MATERIAL   MATERIAL    MATERIAL'
-    moose_outputs = '     pk1_stress M1       M3       M4       M5       poro       phis        perm'
-    neml2_outputs = '     state/pk1  state/M1 state/M3 state/M4 state/M5 state/poro state/solid state/perm'
-
-    moose_derivative_types = 'MATERIAL               MATERIAL           MATERIAL
-                              MATERIAL               MATERIAL           MATERIAL'
-    moose_derivatives = '     dM5dphif               dM1dF              pk1_jacobian
-                              dpk1dphif              dM5dF              dM4dphif'
-    neml2_derivatives = '     state/M5 forces/phif;  state/M1 forces/F; state/pk1 forces/F;
-                              state/pk1 forces/phif; state/M5 forces/F; state/M4 forces/phif'
+    derivatives = 'M5 phif dM5dphif; M1 deformation_gradient dM1dF;
+                   pk1_stress deformation_gradient pk1_jacobian; pk1_stress phif dpk1dphif;
+                   M5 deformation_gradient dM5dF; M4 phif dM4dphif;
+                   M3 phif dM3dphif'
   []
 []
 
@@ -248,19 +211,19 @@ displace_value_y = -0.5
   []
   [constant_derivative]
     type = GenericConstantMaterial
-    prop_names = ' dM1dP dM1dphif dM2dphif dM2dP dM3dphif dM3dP dM4dP dM5dP'
-    prop_values = '0.0   0.0      0.0     0.0    0.0     0.0    0.0   0.0'
+    prop_names = ' dM1dP dM1dphif dM2dphif dM2dP dM3dP dM4dP dM5dP'
+    prop_values = '0.0   0.0      0.0     0.0    0.0   0.0   0.0'
   []
   [void_feature]
     type = GenericConstantMaterial
-    prop_names = 'void E'
-    prop_values = '${porosity_feature} ${E_feature}'
+    prop_names = 'void'
+    prop_values = '${porosity_feature}'
     block = circle
   []
   [void_background]
     type = GenericConstantMaterial
-    prop_names = 'void E'
-    prop_values = '${porosity_background} ${E_background}'
+    prop_names = 'void'
+    prop_values = '${porosity_background}'
     block = non_circle
   []
   [zeroR2]
@@ -316,7 +279,7 @@ displace_value_y = -0.5
     outlet_flux = flux_out
     product_fraction = 0.0
     product_fraction_derivative = 0.0
-    solid_fraction = phis
+    solid_fraction = solid
     solid_fraction_derivative = 0.0
     variable = phif
   []

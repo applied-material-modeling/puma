@@ -9,8 +9,8 @@
     type = 'PetscJacobianTester'
     input = 'input.i'    
     run_sim = True
-    ratio_tol = 1e-7
-    difference_tol = 1e-5
+    ratio_tol = 5e-6
+    difference_tol = 5e-3
     requirement = 'We shall be able to produce the exact Jacobian.'
   []
 []

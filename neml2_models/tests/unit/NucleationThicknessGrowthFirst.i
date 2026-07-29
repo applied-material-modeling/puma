@@ -1,8 +1,3 @@
-[Settings]
-  additional_libraries = 'libpuma_matlib.so'
-[]
-
-
 [Drivers]
   [unit]
     type = ModelUnitTest

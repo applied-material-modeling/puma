@@ -1,8 +1,32 @@
-initial_product_dummy_thickness = 1e-3
-
-[Settings]
-  additional_libraries = 'neml2/puma_custom_neml2'
-[]
+initial_product_dummy_thickness = 0.001
+reactivity_lowbound = 0.005
+reactivity_upbound = 0.05
+D = 0.00019
+oP_oL = 1.143421422617255  # omega_SiC/omega_Si
+K_nucl_growth = 2.4e-14
+omega_SiC = 12.495327102803738  # M_SiC/rho_SiC
+mhcolc = -0.152
+oSiCm1 = 0.0800299177262528  # 1/omega_SiC
+oCm1 = 0.18816085255182746  # 1/omega_C
+chem_ratio = 1.0  # k_SiC/k_C
+mchem_P = -1.0  # -k_SiC
+omega_Si = 10.928015564202335  # M_Si/rho_Si
+rhof = 2.57  # rho_Si
+rhof_nu = 257.0  # rho_Si/mu_Si
+rhof2_nu = 660.4899999999999  # rho_Si^2/mu_Si
+om_phinoreact = 1.0
+Dmacro = 7e-05
+delta_Dscale_front = 0.00033
+delta_Dscale_back = 0.0  # D_macro_low - D_macro
+new_scale = -0.1  # (tsb - tsbs)/2
+transition_saturation_front = 0.75
+transition_saturation_back = 0.45
+transition_saturation_back_start = 0.65
+kk_L = 1e-08  # kk_ref
+permeability_power = 10.0
+phif_residual = 0.0  # phi_L_residual
+brooks_corey_threshold = 50000.0
+capillary_pressure_power = 10
 
 [Solvers]
     [newton]
@@ -19,35 +43,30 @@ initial_product_dummy_thickness = 1e-3
     [eq_sys]
         type = NonlinearSystem
         model = 'model_residual'
+        unknowns = 'phip phis'
+        residuals = 'phip_residual phis_residual'
     []
 []
 
 [Models]
-    ################################################################
-    ###                                                          ###
-    ###                                                          ###
-    ###                   CONSTITUTIVE MODEL                      ##
-    ###                                                          ###
-    ###                                                          ###
-    ################################################################
     [outer_radius]
         type = CylindricalChannelGeometry
-        solid_fraction = 'state/phis'
-        product_fraction = 'state/phip'
-        inner_radius = 'state/ri'
-        outer_radius = 'state/ro'
+        solid_fraction = 'phis'
+        product_fraction = 'phip'
+        inner_radius = 'ri'
+        outer_radius = 'ro'
     []
     [fluid_reactivity]
         type = HermiteSmoothStep
-        argument = 'forces/phif'
-        value = 'state/R_L'
+        argument = 'phif'
+        value = 'R_L'
         lower_bound = ${reactivity_lowbound}
         upper_bound = ${reactivity_upbound}
     []
     [solid_reactivity]
         type = HermiteSmoothStep
-        argument = 'state/phis'
-        value = 'state/R_S'
+        argument = 'phis'
+        value = 'R_S'
         lower_bound = ${reactivity_lowbound}
         upper_bound = ${reactivity_upbound}
     []
@@ -55,121 +74,114 @@ initial_product_dummy_thickness = 1e-3
         type = DiffusionLimitedReactionUpdate
         diffusion_coefficient = '${D}'
         molar_volume = '${oP_oL}'
-        product_inner_radius = 'state/ri'
-        solid_inner_radius = 'state/ro'
-        liquid_reactivity = 'state/R_L'
-        solid_reactivity = 'state/R_S'
-        reaction_rate = 'state/react_diff'
+        product_inner_radius = 'ri'
+        solid_inner_radius = 'ro'
+        liquid_reactivity = 'R_L'
+        solid_reactivity = 'R_S'
+        reaction_rate = 'react_diff'
         product_dummy_thickness = ${initial_product_dummy_thickness}
     []
-    ##
     [nucleation_controlled]
         type = NucleationLimitedReaction
         growth_constant = ${K_nucl_growth}
         product_molar_volume = ${omega_SiC}
-        product_volume_fraction = 'state/phip'
-        reaction_rate = 'state/react_nucl'
-        liquid_reactivity = 'state/R_L'
-        solid_reactivity = 'state/R_S'
+        product_volume_fraction = 'phip'
+        reaction_rate = 'react_nucl'
+        liquid_reactivity = 'R_L'
+        solid_reactivity = 'R_S'
         order_type = 'FIRST'
     []
     [transition]
         type = ScalarLinearCombination
-        from_var = 'state/ro state/ri'
-        to_var = 'state/rate_transition'
-        coefficients = '1 -1'
-        constant_coefficient = ${mhcolc}
+        from = 'ro ri'
+        to = 'rate_transition'
+        weights = '1 -1'
+        offset = ${mhcolc}
     []
     [switchoff_diff]
         type = HermiteSmoothStep
-        argument = 'state/rate_transition'
-        value = 'state/Hdiff'
+        argument = 'rate_transition'
+        value = 'Hdiff'
         lower_bound = 0.0
         upper_bound = 0.1
         complement = false
     []
     [switchoff_nucl]
         type = ScalarLinearCombination
-        from_var = 'state/Hdiff'
-        to_var = 'state/Hnucl'
-        coefficients = -1.0
-        constant_coefficient = 1.0
+        from = 'Hdiff'
+        to = 'Hnucl'
+        weights = -1.0
+        offset = 1.0
     []
     [diffusion_rate_switch]
         type = ScalarMultiplication
-        from_var = 'state/react_diff state/Hdiff'
-        to_var = 'state/rate_diff'
+        from = 'react_diff Hdiff'
+        to = 'rate_diff'
     []
     [nucleation_rate_switch]
         type = ScalarMultiplication
-        from_var = 'state/react_nucl state/Hnucl'
-        to_var = 'state/rate_nucl'
+        from = 'react_nucl Hnucl'
+        to = 'rate_nucl'
     []
     [reaction_rate]
         type = ScalarLinearCombination
-        from_var = 'state/rate_diff state/rate_nucl'
-        to_var = 'state/react'
+        from = 'rate_diff rate_nucl'
+        to = 'react'
     []
-    ##
     [substance_product]
         type = ScalarLinearCombination
-        from_var = 'state/phip'
-        to_var = 'state/alpha_p'
-        coefficients = '${oSiCm1}'
+        from = 'phip'
+        to = 'alpha_p'
+        weights = '${oSiCm1}'
     []
     [substance_product_old]
         type = ScalarLinearCombination
-        from_var = 'old_state/phip'
-        to_var = 'old_state/alpha_p'
-        coefficients = '${oSiCm1}'
+        from = 'phip~1'
+        to = 'alpha_p~1'
+        weights = '${oSiCm1}'
     []
     [product_rate]
         type = ScalarVariableRate
-        variable = 'state/alpha_p'
-        rate = 'state/adot_p'
-        time = 'forces/t'
+        variable = 'alpha_p'
+        time = 't'
     []
     [substance_solid]
         type = ScalarLinearCombination
-        from_var = 'state/phis'
-        to_var = 'state/alpha_s'
-        coefficients = '${oCm1}'
+        from = 'phis'
+        to = 'alpha_s'
+        weights = '${oCm1}'
     []
     [substance_solid_old]
         type = ScalarLinearCombination
-        from_var = 'old_state/phis'
-        to_var = 'old_state/alpha_s'
-        coefficients = '${oCm1}'
+        from = 'phis~1'
+        to = 'alpha_s~1'
+        weights = '${oCm1}'
     []
     [solid_rate]
         type = ScalarVariableRate
-        variable = 'state/alpha_s'
-        rate = 'state/adot_s'
-        time = 'forces/t'
+        variable = 'alpha_s'
+        time = 't'
     []
-    ### ----------------------------
-    ### IVP
-    ### ----------------------------
     [residual_phip]
         type = ScalarLinearCombination
-        from_var = 'state/adot_p state/react'
-        to_var = 'residual/phip'
-        coefficients = '1.0 -1.0'
+        from = 'alpha_p_rate react'
+        to = 'phip_residual'
+        weights = '1.0 -1.0'
     []
     [residual_phis]
         type = ScalarLinearCombination
-        from_var = 'state/adot_p state/adot_s'
-        to_var = 'residual/phis'
-        coefficients = '1.0 ${chem_ratio}'
+        from = 'alpha_p_rate alpha_s_rate'
+        to = 'phis_residual'
+        weights = '1.0 ${chem_ratio}'
     []
     [model_residual]
         type = ComposedModel
         models = "residual_phip residual_phis
                   outer_radius fluid_reactivity solid_reactivity
-                  reaction_rate substance_product product_rate 
+                  reaction_rate substance_product product_rate
                   substance_solid solid_rate
                   diffusion_controlled nucleation_controlled
-                  transition switchoff_diff switchoff_nucl 
+                  transition switchoff_diff switchoff_nucl
                   diffusion_rate_switch nucleation_rate_switch
                   substance_solid_old substance_product_old"
     []
@@ -182,32 +194,24 @@ initial_product_dummy_thickness = 1e-3
         type = ComposedModel
         models = 'model_update'
     []
-    ################################################################
-    ###                                                          ###
-    ###                                                          ###
-    ###                   POST PROCESS VALUES                     ##
-    ###                                                          ###
-    ###                                                          ###
-    ################################################################
-    # get the source term
     [outer_radius_new]
         type = CylindricalChannelGeometry
-        solid_fraction = 'state/phis'
-        product_fraction = 'state/phip'
-        inner_radius = 'state/ri'
-        outer_radius = 'state/ro'
+        solid_fraction = 'phis'
+        product_fraction = 'phip'
+        inner_radius = 'ri'
+        outer_radius = 'ro'
     []
     [fluid_reactivity_new]
         type = HermiteSmoothStep
-        argument = 'forces/phif'
-        value = 'state/R_L'
+        argument = 'phif'
+        value = 'R_L'
         lower_bound = ${reactivity_lowbound}
         upper_bound = ${reactivity_upbound}
     []
     [solid_reactivity_new]
         type = HermiteSmoothStep
-        argument = 'state/phis'
-        value = 'state/R_S'
+        argument = 'phis'
+        value = 'R_S'
         lower_bound = ${reactivity_lowbound}
         upper_bound = ${reactivity_upbound}
     []
@@ -215,84 +219,84 @@ initial_product_dummy_thickness = 1e-3
         type = DiffusionLimitedReactionUpdate
         diffusion_coefficient = '${D}'
         molar_volume = '${oP_oL}'
-        product_inner_radius = 'state/ri'
-        solid_inner_radius = 'state/ro'
-        liquid_reactivity = 'state/R_L'
-        solid_reactivity = 'state/R_S'
-        reaction_rate = 'state/react_diff'
+        product_inner_radius = 'ri'
+        solid_inner_radius = 'ro'
+        liquid_reactivity = 'R_L'
+        solid_reactivity = 'R_S'
+        reaction_rate = 'react_diff'
         product_dummy_thickness = ${initial_product_dummy_thickness}
     []
     [nucleation_controlled_new]
         type = NucleationLimitedReaction
         growth_constant = ${K_nucl_growth}
         product_molar_volume = ${omega_SiC}
-        product_volume_fraction = 'state/phip'
-        reaction_rate = 'state/react_nucl'
+        product_volume_fraction = 'phip'
+        reaction_rate = 'react_nucl'
         order_type = 'FIRST'
-        liquid_reactivity = 'state/R_L'
-        solid_reactivity = 'state/R_S'
+        liquid_reactivity = 'R_L'
+        solid_reactivity = 'R_S'
     []
     [transition_new]
         type = ScalarLinearCombination
-        from_var = 'state/ro state/ri'
-        to_var = 'state/rate_transition'
-        coefficients = '1 -1'
-        constant_coefficient = ${mhcolc}
+        from = 'ro ri'
+        to = 'rate_transition'
+        weights = '1 -1'
+        offset = ${mhcolc}
     []
     [switchoff_diff_new]
         type = HermiteSmoothStep
-        argument = 'state/rate_transition'
-        value = 'state/Hdiff'
+        argument = 'rate_transition'
+        value = 'Hdiff'
         lower_bound = 0.0
         upper_bound = 0.1
         complement = false
     []
     [switchoff_nucl_new]
         type = ScalarLinearCombination
-        from_var = 'state/Hdiff'
-        to_var = 'state/Hnucl'
-        coefficients = -1.0
-        constant_coefficient = 1.0
+        from = 'Hdiff'
+        to = 'Hnucl'
+        weights = -1.0
+        offset = 1.0
     []
     [diffusion_rate_switch_new]
         type = ScalarMultiplication
-        from_var = 'state/react_diff state/Hdiff'
-        to_var = 'state/rate_diff'
+        from = 'react_diff Hdiff'
+        to = 'rate_diff'
     []
     [nucleation_rate_switch_new]
         type = ScalarMultiplication
-        from_var = 'state/react_nucl state/Hnucl'
-        to_var = 'state/rate_nucl'
+        from = 'react_nucl Hnucl'
+        to = 'rate_nucl'
     []
     [reaction_rate_new]
         type = ScalarLinearCombination
-        from_var = 'state/rate_diff state/rate_nucl'
-        to_var = 'state/react'
+        from = 'rate_diff rate_nucl'
+        to = 'react'
     []
     [alpha_rate]
         type = ScalarLinearCombination
-        from_var = 'state/react'
-        to_var = 'state/alpha_dot'
-        coefficients = '${mchem_P}'
+        from = 'react'
+        to = 'alpha_dot'
+        weights = '${mchem_P}'
     []
     [liquid_consumption_rate]
         type = ScalarLinearCombination
-        from_var = 'state/alpha_dot'
-        to_var = 'state/phidotf'
-        coefficients = '${omega_Si}'
+        from = 'alpha_dot'
+        to = 'phidotf'
+        weights = '${omega_Si}'
     []
     [M5]
         type = ScalarLinearCombination
-        from_var = 'state/phidotf'
-        to_var = 'state/M5'
-        coefficients = '${rhof}'
+        from = 'phidotf'
+        to = 'M5'
+        weights = '${rhof}'
     []
     [void]
         type = ScalarLinearCombination
-        from_var = 'state/phip state/phis forces/phif'
-        to_var = 'state/poro'
-        coefficients = '-1.0 -1.0 -1.0'
-        constant_coefficient = ${om_phinoreact}
+        from = 'phip phis phif'
+        to = 'poro'
+        weights = '-1.0 -1.0 -1.0'
+        offset = ${om_phinoreact}
     []
     [model_M5]
         type = ComposedModel
@@ -303,97 +307,95 @@ initial_product_dummy_thickness = 1e-3
         diffusion_rate_switch_new nucleation_rate_switch_new
         fluid_reactivity_new solid_reactivity_new'
     []
-    # get the other material term
     [phif_max]
         type = ScalarLinearCombination
-        from_var = 'state/phip state/phis'
-        to_var = 'state/phif_max'
-        coefficients = '-1.0 -1.0'
-        constant_coefficient = ${om_phinoreact}
+        from = 'phip phis'
+        to = 'phif_max'
+        weights = '-1.0 -1.0'
+        offset = ${om_phinoreact}
     []
     [skeleton]
         type = ScalarLinearCombination
-        from_var = 'state/phif_max'
-        to_var = 'state/phi_skeleton'
-        coefficients = '-1.0'
-        constant_coefficient = 1.0
+        from = 'phif_max'
+        to = 'new_solid'
+        weights = '-1.0'
+        offset = 1.0
     []
     [permeability]
         type = PowerLawPermeability
         reference_permeability = ${kk_L}
         reference_porosity = 0.9
         exponent = ${permeability_power}
-        porosity = 'state/phif_max'
-        permeability = 'state/perm'
+        porosity = 'phif_max'
+        permeability = 'perm'
     []
     [effective_saturation]
         type = EffectiveSaturationSecondOrder
         residual_saturation = ${phif_residual}
-        fluid_fraction = 'forces/phif'
-        max_fraction = 'state/phif_max'
-        effective_saturation = 'state/Seff'
+        fluid_fraction = 'phif'
+        max_fraction = 'phif_max'
+        effective_saturation = 'Seff'
     []
     [M3]
         type = ScalarLinearCombination
-        coefficients = "${rhof_nu}"
-        from_var = 'state/perm'
-        to_var = 'state/M3'
+        weights = "${rhof_nu}"
+        from = 'perm'
+        to = 'M3'
     []
     [M4]
         type = ScalarMultiplication
-        coefficient = "${rhof2_nu}"
-        from_var = 'state/perm state/Seff'
-        to_var = 'state/M4'
+        scaling = "${rhof2_nu}"
+        from = 'perm Seff'
+        to = 'M4'
     []
     [capillary_pressure]
         type = BrooksCoreyCapillaryPressure
         threshold_pressure = '${brooks_corey_threshold}'
         exponent = '${capillary_pressure_power}'
-        effective_saturation = 'state/Seff'
-        capillary_pressure = 'state/Pc'
+        effective_saturation = 'Seff'
+        capillary_pressure = 'Pc'
         log_extension = true
         transition_saturation = 0.1
     []
     [M2_functional_form_front]
         type = HermiteSmoothStep
-        argument = 'state/Seff'
-        value = 'state/M2_form_front'
+        argument = 'Seff'
+        value = 'M2_form_front'
         lower_bound = '${transition_saturation_front}'
         upper_bound = 1.0
     []
     [M2_front]
         type = ScalarLinearCombination
-        from_var = 'state/M2_form_front'
-        to_var = 'state/M2_front'
-        coefficients = '${delta_Dscale_front}'
-        constant_coefficient = '${Dmacro}'
+        from = 'M2_form_front'
+        to = 'M2_front'
+        weights = '${delta_Dscale_front}'
+        offset = '${Dmacro}'
     []
     [M2_functional_form_back]
         type = SymmetricHermiteInterpolation
-        argument = 'state/Seff'
-        value = 'state/M2_form_back_flip'
+        argument = 'Seff'
+        output = 'M2_form_back_flip'
         lower_bound = '${transition_saturation_back_start}'
         upper_bound = '${transition_saturation_back}'
     []
     [M2_back_flip]
         type = ScalarLinearCombination
-        from_var = 'state/M2_form_back_flip'
-        to_var = 'state/M2_form_back'
-        coefficients = '${new_scale}'
-        #constant_coefficient = 1.0
+        from = 'M2_form_back_flip'
+        to = 'M2_form_back'
+        weights = '${new_scale}'
     []
     [M2_back]
         type = ScalarLinearCombination
-        from_var = 'state/M2_form_back'
-        to_var = 'state/M2_back'
-        coefficients = '${delta_Dscale_back}'
-        constant_coefficient = '${Dmacro}'
+        from = 'M2_form_back'
+        to = 'M2_back'
+        weights = '${delta_Dscale_back}'
+        offset = '${Dmacro}'
     []
     [M2_model]
         type = ScalarLinearCombination
-        from_var = 'state/M2_front state/M2_back'
-        to_var = 'state/M2'
-        coefficients = '${rhof} ${rhof}'
+        from = 'M2_front M2_back'
+        to = 'M2'
+        weights = '${rhof} ${rhof}'
     []
     [M2]
         type = ComposedModel
@@ -402,20 +404,20 @@ initial_product_dummy_thickness = 1e-3
     []
     [M6]
         type = ScalarLinearCombination
-        from_var = 'state/Pc'
-        to_var = 'state/M6'
-        coefficients = '-1.0'
+        from = 'Pc'
+        to = 'M6'
+        weights = '-1.0'
     []
     [model_M346]
         type = ComposedModel
         models = 'phif_max skeleton
         permeability effective_saturation capillary_pressure
         M2 M3 M4 M6'
-        additional_outputs = 'state/perm state/phif_max state/Seff'
+        additional_outputs = 'perm phif_max Seff'
     []
     [model]
         type = ComposedModel
         models = 'model_solver model_M5 model_M346'
-        additional_outputs = 'state/phip state/phis'
+        additional_outputs = 'phip phis'
     []
 []

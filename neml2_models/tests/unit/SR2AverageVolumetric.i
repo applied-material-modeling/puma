@@ -1,11 +1,7 @@
-[Settings]
-  additional_libraries = 'libpuma_matlib.so'
-[]
-
 [Tensors]
   [A]
-    type = FillSR2
-    values = '1.0 2.0 3.0 4.0 5.0 6.0'
+    type = Python
+    expr = "SR2.fill(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, dtype=torch.float64)"
   []
 []
 

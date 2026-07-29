@@ -41,10 +41,25 @@ conda env create -f environment.yml
 
 2. __MOOSE with NEML2__
 
-The required libraries can be obtained form the github packages below, however, it is recommended to follow the instructions below or the official websites to make sure the dependencies are satisfied:
+PUMA builds against __NEML2 v3 (with the pyzag v2 port)__. The exact versions are pinned as git submodules:
 
-- MOOSE: `https://github.com/idaholab/moose.git` with branch: `master`
-- NEML2: `git@github.com:applied-material-modeling/neml2.git` with branch: `main`
+- MOOSE: `https://github.com/hugary1995/moose.git` @ `neml2-v3-migration` → submodule `moose/`
+- NEML2: `https://github.com/hdt5kt/neml2.git` @ `pyzag_v3_port` → submodule `neml2/`
+
+Clone PUMA and populate the two submodules at their pinned commits:
+
+```bash
+git clone https://github.com/applied-material-modeling/puma.git
+cd puma
+git checkout development              # the NEML2 v3 development line
+git submodule update --init          # pulls moose/ and neml2/ (not moose's own submodules)
+```
+
+`git submodule update --init` is intentionally non-recursive: it fetches only `moose/` and `neml2/`. MOOSE's own submodules (PETSc, libMesh, WASP) are initialized by MOOSE's build scripts in the steps below, not by PUMA.
+
+The `moose/` submodule is picked up automatically by PUMA's `Makefile`. To build against a MOOSE checkout elsewhere, set `MOOSE_DIR` to its path — the submodule is then optional. The `neml2/` submodule is linked into MOOSE via `NEML2_SRC_DIR` during the NEML2 build step below.
+
+`scripts/get_dependencies.sh` wraps the submodule init and the NEML2 build (`scripts/get_dependencies.sh --help` for options). The steps below do the same manually and document the PETSc/libMesh/libtorch prerequisites.
 
 Here are the resources to successfully compile MOOSE with NEML2
 
@@ -56,30 +71,22 @@ Here are the resources to successfully compile MOOSE with NEML2
 
 __Instructions__: at least worked for `Ubuntu 20.04` with the appropriate `mpi` and compiler packages. Check the above websites for prerequisites and dependencies.
 
-- Here we assume the current path is in an empty folder. This folder will contain all of the MOOSE related programs. Also there is a current conda environment activated with the necessary dependencies.
+- These steps assume you are inside the PUMA repo (with submodules populated) and a conda environment with the necessary dependencies is active.
 
-```bash
-mkdir projects
-cd projects
-```
-
-- Build MOOSE: make sure the gcc / compilers are located in the correct path, usually it is `/usr/bin/mpicc`.
+- Build MOOSE's PETSc, libMesh, and WASP from the `moose/` submodule. Make sure the gcc / compilers are on the correct path, usually `/usr/bin/mpicc`.
 
 ```bash
 export CC=mpicc CXX=mpicxx FC=mpif90 F90=mpif90 F77=mpif77
-git clone https://github.com/idaholab/moose.git
 export MOOSE_DIR=${PWD}/moose
-cd moose
-git checkout master
 export MOOSE_JOBS=12 METHODS=opt
-cd scripts
+cd moose/scripts
 ./update_and_rebuild_petsc.sh
 ./update_and_rebuild_libmesh.sh
 ./update_and_rebuild_wasp.sh
 cd ../../
 ```
 
-- Obtain GPU-enable based libtorch (this is for CUDA 12.6 - find compatibility matrix at: `https://github.com/pytorch/pytorch/blob/main/RELEASE.md#release-compatibility-matrix`). If other versions are required, change the argument for the wget command from `https://pytorch.org/get-started/locally/`. Make sure to select `Stable` `Linux` `LibTorch`. Copy and paste the link in `Run this Command:`. Make sure to do this outside of moose and inside the `projects` folder.
+- Obtain GPU-enable based libtorch (this is for CUDA 12.6 - find compatibility matrix at: `https://github.com/pytorch/pytorch/blob/main/RELEASE.md#release-compatibility-matrix`). If other versions are required, change the argument for the wget command from `https://pytorch.org/get-started/locally/`. Make sure to select `Stable` `Linux` `LibTorch`. Copy and paste the link in `Run this Command:`. Place it outside the `moose/` submodule (e.g. at the PUMA repo root).
 
 ```bash
 wget https://download.pytorch.org/libtorch/cu126/libtorch-shared-with-deps-2.10.0%2Bcu126.zip
@@ -87,12 +94,14 @@ unzip libtorch-shared-with-deps-2.10.0+cu126.zip
 export LIBTORCH_DIR=${PWD}/libtorch
 ```
 
-- Obtain the compatible NEML2 and compile NEML2 for MOOSE and python package.
+- Configure MOOSE and build NEML2 for MOOSE and the python package. `NEML2_SRC_DIR` points MOOSE at the `neml2/` submodule (the `pyzag_v3_port` version), overriding MOOSE's own pinned NEML2 submodule.
 
 ```bash
+export NEML2_SRC_DIR=${PWD}/neml2
 cd moose
 ./configure --with-libtorch --with-neml2
-./scripts/update_and_rebuild_neml2.sh
+NEML2_SRC_DIR=${NEML2_SRC_DIR} ./scripts/update_and_rebuild_neml2.sh --skip-submodule-update
+cd ..
 ```
 
 Once neml2 is compiled, some message like this will appear, run the `cd <messagaes>`.
@@ -107,26 +116,24 @@ To configure MOOSE with NEML2, run the following commands:
 
 Look at the last line, if it said `config.status: framework/include/base/MooseConfig.h is unchanged`. Then the NEML2-LIBTORCH configurations point to the correct path.
 
-- Compile PUMA with linked MOOSE-NEML2.
+- Compile PUMA with linked MOOSE-NEML2 (from the PUMA repo root; the `moose/` submodule is used automatically).
 
 ```bash
-cd ../
-git clone git@github.com:applied-material-modeling/puma.git
-cd puma
-git checkout origin/development
 make -j 12
 ```
 
 - Compile NEML2 custom materials in PUMA
 
+PUMA's custom materials are Python models under `neml2_models/python/`, with model definitions in `neml2_models/models/*.i`. `neml2-compile` turns each definition into an AOTInductor artifact under an `aoti/` folder that the MOOSE input files load at runtime. The `aoti/` folders are git-ignored and generated locally, e.g.:
+
 ```bash
 cd neml2_models
-cmake \
-  -Dneml2_ROOT=${PWD}/moose/framework/contrib/neml2/installed/moose \
-  -DPUMA_MATLIB_TESTS=off -DCatch2_DIR=${PWD}/moose/framework/contrib/neml2/contrib/Catch2/lib/cmake/Catch2 \
-  -Dwasp_ROOT=/home/tranh/projects/aps_build/neml2/contrib/wasp -DCMAKE_BUILD_TYPE=Release -B build/release -S .
-cmake --build build/release -j 16
+neml2-compile --model model models/pyrolysis_1d.i \
+  --dtype float64 --device cpu \
+  --output-dir aoti/pyrolysis_1d --load python -d ":"
 ```
+
+Each example under `examples/` carries a `*_scripts.py` that compiles the models it needs with the same `neml2-compile` invocation. Model unit tests run via `neml2_models/tests/unit/run_model_unit_tests.py`.
 
 - Make sure the conda environment from `environment.ymal` is active. Then do:
 

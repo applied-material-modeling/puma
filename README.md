@@ -33,11 +33,13 @@ https://github.com/skounouho/puma-cobra.git
 
 1. __Required python packages__
 
-- check `environment.ymal` for full list of required Python packages with conda environment. This environment will be named `graintrace_env`. To create the same environment with conda, run:
+- check `environment.yml` for the full list of required Python packages. This environment is named `graintrace_env` and provides the NEML2 v3 stack: `neml2` 3.0.7, `pyzag` 2.0.0, `torch` 2.12.1, and `numpy` 2.4.6. To create it with conda, run:
 
 ```bash
 conda env create -f environment.yml
 ```
+
+The `neml2` Python package from PyPI (3.0.7) is sufficient for the `neml2-compile` and calibration workflows. The MOOSE build step below rebuilds NEML2 from the `neml2/` submodule and reinstalls it into this environment so the C++ library MOOSE links against and the Python package stay in lockstep.
 
 2. __MOOSE with NEML2__
 

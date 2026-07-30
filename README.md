@@ -33,13 +33,15 @@ https://github.com/skounouho/puma-cobra.git
 
 1. __Required python packages__
 
-- check `environment.yml` for the full list of required Python packages. This environment is named `graintrace_env` and provides the NEML2 v3 stack: `neml2` 3.0.7, `pyzag` 2.0.0, `torch` 2.12.1, and `numpy` 2.4.6. To create it with conda, run:
+- check `environment.yml` for the full list of required Python packages. This environment is named `graintrace_env` and provides the NEML2 v3 runtime stack: `pyzag` 2.0.0, `torch` 2.12.1, and `numpy` 2.4.6. To create it with conda, run:
 
 ```bash
 conda env create -f environment.yml
 ```
 
-The `neml2` Python package from PyPI (3.0.7) is sufficient for the `neml2-compile` and calibration workflows. The MOOSE build step below rebuilds NEML2 from the `neml2/` submodule and reinstalls it into this environment so the C++ library MOOSE links against and the Python package stay in lockstep.
+`neml2` itself is intentionally **not** pinned in `environment.yml`: the PyPI `neml2` wheel hard-pins `pyzag==1.1.4`, which conflicts with the `pyzag==2.0.0` this stack requires. NEML2 (v3, pyzag-v2 compatible) is instead built from the `neml2/` submodule and pip-installed `--no-deps` into this environment by the MOOSE build step below (`update_and_rebuild_neml2.sh`), which also provides the C++ library MOOSE links against — so the C++ and Python NEML2 stay in lockstep.
+
+> **pyzag note.** The material-calibration examples drive NEML2 3.0.7 through pyzag's adjoint, which needs the pyzag **v2 operators abstraction** (`pyzag.operators`, `pyzag.chunktime.BidiagonalPCRFactorization`) matching the `neml2/` submodule. This lives on the `hdt5kt/pyzag` fork; make sure the environment's `pyzag` provides `pyzag.operators` (a plain PyPI `pyzag` may not). The exact fork branch used for development still needs to be pushed to `hdt5kt/pyzag` for a fully reproducible install.
 
 2. __MOOSE with NEML2__
 
@@ -73,9 +75,9 @@ Here are the resources to successfully compile MOOSE with NEML2
 
 __Instructions__: at least worked for `Ubuntu 20.04` with the appropriate `mpi` and compiler packages. Check the above websites for prerequisites and dependencies.
 
-- These steps assume you are inside the PUMA repo (with submodules populated) and a conda environment with the necessary dependencies is active.
+> **Two environments.** `environment.yml` (`graintrace_env`) is the *analysis/runtime* env (pyzag, plotting, calibration). It does **not** contain the toolchain needed to *build* MOOSE. Build MOOSE + NEML2 + PUMA in a separate **MOOSE build environment** that provides a self-consistent conda toolchain — MPI + compilers + build libs: `mpich`, `gcc_linux-64`, `gxx_linux-64`, `gfortran_linux-64`, `cmake`, `make`, `ninja`, `hdf5`, `netcdf4`, `zlib`, `libaec`, `bison`, `flex`, `m4`, `pkg-config` (this mirrors MOOSE's own dev env). Do not rely on system compilers/MPI — a machine may lack a matching `gfortran`, and mixing conda + system toolchains fails to link.
 
-- Build MOOSE's PETSc, libMesh, and WASP from the `moose/` submodule. Make sure the gcc / compilers are on the correct path, usually `/usr/bin/mpicc`.
+- With that build environment active and the submodules populated, build MOOSE's PETSc, libMesh, and WASP from the `moose/` submodule (the conda `mpicc`/`mpicxx`/`mpif90` wrappers use the conda compilers):
 
 ```bash
 export CC=mpicc CXX=mpicxx FC=mpif90 F90=mpif90 F77=mpif77
@@ -88,15 +90,7 @@ cd moose/scripts
 cd ../../
 ```
 
-- Obtain GPU-enable based libtorch (this is for CUDA 12.6 - find compatibility matrix at: `https://github.com/pytorch/pytorch/blob/main/RELEASE.md#release-compatibility-matrix`). If other versions are required, change the argument for the wget command from `https://pytorch.org/get-started/locally/`. Make sure to select `Stable` `Linux` `LibTorch`. Copy and paste the link in `Run this Command:`. Place it outside the `moose/` submodule (e.g. at the PUMA repo root).
-
-```bash
-wget https://download.pytorch.org/libtorch/cu126/libtorch-shared-with-deps-2.10.0%2Bcu126.zip
-unzip libtorch-shared-with-deps-2.10.0+cu126.zip
-export LIBTORCH_DIR=${PWD}/libtorch
-```
-
-- Configure MOOSE and build NEML2 for MOOSE and the python package. `NEML2_SRC_DIR` points MOOSE at the `neml2/` submodule (the `pyzag_v3_port` version), overriding MOOSE's own pinned NEML2 submodule.
+- Configure MOOSE and build NEML2 for MOOSE and the python package. Do **not** download a standalone libtorch and do **not** set `LIBTORCH_DIR`: `./configure --with-libtorch --with-neml2` auto-discovers the conda `torch` (via the installed `neml2` package), and `update_and_rebuild_neml2.sh` links NEML2 against that same conda torch. Setting `LIBTORCH_DIR` overrides this and pins a different libtorch version — an ABI mismatch. `NEML2_SRC_DIR` points MOOSE at the `neml2/` submodule (the `pyzag_v3_port` version), overriding MOOSE's own pinned NEML2 submodule; it is pip-installed `--no-deps` into the active environment (so the C++ library and Python `neml2` stay in lockstep).
 
 ```bash
 export NEML2_SRC_DIR=${PWD}/neml2
@@ -126,22 +120,25 @@ make -j 12
 
 - Compile NEML2 custom materials in PUMA
 
-PUMA's custom materials are Python models under `neml2_models/python/`, with model definitions in `neml2_models/models/*.i`. `neml2-compile` turns each definition into an AOTInductor artifact under an `aoti/` folder that the MOOSE input files load at runtime. The `aoti/` folders are git-ignored and generated locally, e.g.:
+PUMA's custom materials are Python models under `neml2_models/python/`, with model definitions in `neml2_models/models/*.i`. `neml2-compile` turns each definition into an AOTInductor artifact under an `aoti/` folder that the MOOSE input files load at runtime. The `aoti/` folders are git-ignored and generated locally. **The regression tests require all eight models to be compiled first** (the test inputs load `neml2_models/aoti/<model>/model_aoti.i`, whose baked absolute paths must match this checkout):
 
 ```bash
 cd neml2_models
-neml2-compile --model model models/pyrolysis_1d.i \
-  --dtype float64 --device cpu \
-  --output-dir aoti/pyrolysis_1d --load python -d ":"
+for m in infiltration_1d infiltration_2d pyrolysis_1d pyrolysis_2d \
+         solidification_1d solidification_2d solid_mechanics solid_mechanics_pressure; do
+  neml2-compile --model model models/$m.i \
+    --dtype float64 --device cpu \
+    --output-dir aoti/$m --load python -d ":"
+done
+cd ..
 ```
 
 Each example under `examples/` carries a `*_scripts.py` that compiles the models it needs with the same `neml2-compile` invocation. Model unit tests run via `neml2_models/tests/unit/run_model_unit_tests.py`.
 
-- Make sure the conda environment from `environment.ymal` is active. Then do:
+- With the models compiled, run the test suite:
 
 ```bash
-conda activate graintrace_env
 ./run_tests
 ```
 
-If all tests passed, then it is successfully compiled.
+If all tests pass, the build is complete.

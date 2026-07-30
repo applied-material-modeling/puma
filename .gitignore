@@ -120,6 +120,8 @@ test.cache
 !**/gold/*.json*
 !**/gold/experiment_comp/*.csv
 !**/**/initial_condition.csv
+# Calibration input data must ship with the examples (otherwise they can't run from a clone)
+!**/experiment_data/*.csv
 
 peacock_run_tmp.i
 yaml_dump*

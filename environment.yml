@@ -140,7 +140,9 @@ dependencies:
       - multidict==6.7.0
       - multiprocess==0.70.18
       - mypy-extensions==1.1.0
-      - neml2==3.0.7
+      # neml2 is NOT pinned here: the PyPI wheel hard-pins pyzag==1.1.4, which conflicts
+      # with pyzag==2.0.0. NEML2 (v3, pyzag-v2 compatible) is built from the neml2/
+      # submodule and pip-installed --no-deps by moose/scripts/update_and_rebuild_neml2.sh.
       - networkit==11.2.1
       - networkx==3.5
       - numpy==2.4.6

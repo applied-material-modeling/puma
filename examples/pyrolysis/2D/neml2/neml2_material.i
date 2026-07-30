@@ -31,7 +31,6 @@ o_Vref = 90.93222879364822
 [Solvers]
     [newton]
         type = Newton
-        verbose = false
         linear_solver = 'lu'
     []
     [lu]

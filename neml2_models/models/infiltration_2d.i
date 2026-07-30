@@ -15,7 +15,6 @@ capillary_pressure_power = 3
 [Solvers]
     [newton]
         type = Newton
-        verbose = false
         linear_solver = 'lu'
     []
     [lu]

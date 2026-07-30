@@ -90,25 +90,18 @@ cd moose/scripts
 cd ../../
 ```
 
-- Configure MOOSE and build NEML2 for MOOSE and the python package. Do **not** download a standalone libtorch and do **not** set `LIBTORCH_DIR`: `./configure --with-libtorch --with-neml2` auto-discovers the conda `torch` (via the installed `neml2` package), and `update_and_rebuild_neml2.sh` links NEML2 against that same conda torch. Setting `LIBTORCH_DIR` overrides this and pins a different libtorch version — an ABI mismatch. `NEML2_SRC_DIR` points MOOSE at the `neml2/` submodule (the `pyzag_v3_port` version), overriding MOOSE's own pinned NEML2 submodule; it is pip-installed `--no-deps` into the active environment (so the C++ library and Python `neml2` stay in lockstep).
+- Build NEML2 for MOOSE and the python package, then configure MOOSE against it. `NEML2_SRC_DIR` points at the `neml2/` submodule (the `pyzag_v3_port` version, NEML2 3.0.7), overriding MOOSE's own pinned NEML2; it is pip-installed `--no-deps` into the active environment (so the C++ library and Python `neml2` stay in lockstep). Do **not** download a standalone libtorch and do **not** set `LIBTORCH_DIR` — that pins a mismatched libtorch. Build NEML2 first (it prints the exact `./configure` line to run), then configure with **explicit** `--with-neml2` / `--with-libtorch` paths pointing at the conda site-packages (bare `--with-libtorch` does not reliably auto-discover the conda torch and can fall back to an empty path):
 
 ```bash
 export NEML2_SRC_DIR=${PWD}/neml2
 cd moose
-./configure --with-libtorch --with-neml2
 NEML2_SRC_DIR=${NEML2_SRC_DIR} ./scripts/update_and_rebuild_neml2.sh --skip-submodule-update
+SP=$(python -c 'import neml2, os; print(os.path.dirname(os.path.dirname(neml2.__file__)))')
+./configure --with-neml2="${SP}/neml2" --with-libtorch="${SP}/torch"
 cd ..
 ```
 
-Once neml2 is compiled, some message like this will appear, run the `cd <messagaes>`.
-
-```bash
-****************************************************************************************************
-NEML2 has been successfully installed.
-To configure MOOSE with NEML2, run the following commands:
-  cd <messages>
-****************************************************************************************************
-```
+`update_and_rebuild_neml2.sh` prints the exact `./configure --with-neml2=… --with-libtorch=…` line on success; the command above reconstructs those site-packages paths so you can paste-and-run.
 
 Look at the last line, if it said `config.status: framework/include/base/MooseConfig.h is unchanged`. Then the NEML2-LIBTORCH configurations point to the correct path.
 

@@ -33,7 +33,6 @@ o_Vref = 90.93222879364822            # 1/V0 (was MOOSE param Jvolume_c_0)
 [Solvers]
     [newton]
         type = Newton
-        verbose = false
         linear_solver = 'lu'
     []
     [lu]

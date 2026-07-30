@@ -17,7 +17,6 @@ phip_noreact = 0.5
 [Solvers]
     [newton]
         type = Newton
-        verbose = false
         linear_solver = 'lu'
     []
     [lu]

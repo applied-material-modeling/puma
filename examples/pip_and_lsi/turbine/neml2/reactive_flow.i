@@ -38,7 +38,6 @@ Tref = 300.0
 [Solvers]
     [newton]
         type = Newton
-        verbose = false
         linear_solver = 'lu'
     []
     [lu]

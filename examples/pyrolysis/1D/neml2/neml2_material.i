@@ -27,7 +27,6 @@ mwb0 = -0.5555555555555556
 [Solvers]
     [newton]
         type = Newton
-        verbose = false
         linear_solver = 'lu'
     []
     [lu]

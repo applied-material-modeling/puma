@@ -31,7 +31,6 @@ cphiop = 0.99
 [Solvers]
     [newton]
         type = Newton
-        verbose = false
         linear_solver = 'lu'
     []
     [lu]

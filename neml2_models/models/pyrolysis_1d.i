@@ -29,7 +29,6 @@ mwb0 = -0.5555555555555556        # -wb0 = -10/18 (was MOOSE param binder_rate_c
 [Solvers]
     [newton]
         type = Newton
-        verbose = false
         linear_solver = 'lu'
     []
     [lu]

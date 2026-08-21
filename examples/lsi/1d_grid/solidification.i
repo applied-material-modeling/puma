@@ -156,7 +156,6 @@ gravity = 0.0 # cm/s2
     input = 'neml2/aoti_solidification/model_aoti.i'
     [all]
         model = 'model'
-        verbose = true
         device = 'cpu'
 
 

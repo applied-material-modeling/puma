@@ -1,14 +1,14 @@
-D = 2.65e-6
+D = 2.65e-06
 omega_Si = 10.928015564202335
 oSiCm1 = 0.0800299177262528
 oCm1 = 0.18816085255182746
 chem_ratio = 1.0
 mchem_P = -1.0
 rhof = 2.57
-kk_L = 2e-5
+kk_L = 2e-05
 permeability_power = 3
 rhof_nu = 0.257
-rhof2_nu = 0.66049
+rhof2_nu = 0.6604899999999999
 brooks_corey_threshold = 100000.0
 capillary_pressure_power = 3
 

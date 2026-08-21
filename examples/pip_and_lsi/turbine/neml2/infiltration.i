@@ -77,7 +77,7 @@ capillary_pressure_power = 8
         type = R2Multiplication
         A = 'deformation_gradient'
         B = 'pk2_stress'
-        to = 'pk1_stress'
+        to = 'neml2_pk1'
         invert_B = false
     []
     [model_pk1]
@@ -89,6 +89,7 @@ capillary_pressure_power = 8
     [model_sm]
         type = ComposedModel
         models = 'Jacobian M1 model_pk1'
+        additional_outputs = 'pk2_stress'
     []
     ## porous flow -----------------------------------------------------------------
     # phif_max is a bare gathered input (spatial void from MOOSE), not a constant.
@@ -168,6 +169,6 @@ capillary_pressure_power = 8
     [model]
         type = ComposedModel
         models = 'model_sm model_porousflow'
-        additional_outputs = 'pk1_stress'
+        additional_outputs = 'neml2_pk1 pk2_stress'
     []
 []

@@ -2,6 +2,8 @@
 
 PUMA is a high performance modeling framework to simulate powder processing. It provides a scalable tool for manufacturers to simulate powder pre- and post-processing.
 
+Reference: https://www.sciencedirect.com/science/article/pii/S0965997826001225 
+
 The tool can predict distortion, residual stress, and (for reactive processes) reaction completion fraction of complex parts after curing/debinding, sintering, and infiltration processes. These predictions are key metrics industry uses to optimize these processes to produce dense, defect-free, stable components.
 
 
@@ -31,24 +33,28 @@ Refer to `examples` folder for usage demonstrations and sample input.
 For the random field generation from images:
 https://github.com/skounouho/puma-cobra.git
 
-1. __Required python packages__
+1. __Python environment__
 
-- check `environment.yml` for the full list of required Python packages. This environment is named `graintrace_env` and provides the NEML2 v3 runtime stack: `pyzag` 2.0.0, `torch` 2.12.1, and `numpy` 2.4.6. To create it with conda, run:
+Use a single conda environment that carries both the MOOSE build toolchain and NEML2's Python dependencies. NEML2 supplies its own runtime/build stack (`torch`, `pyzag` 2.0.0, `nmhit`), so there is no separate pinned list to maintain:
 
 ```bash
-conda env create -f environment.yml
+conda create -n puma python=3.13 \
+  mpich gcc_linux-64 gxx_linux-64 gfortran_linux-64 \
+  cmake make ninja hdf5 netcdf4 zlib libaec bison flex m4 pkg-config
+conda activate puma
+pip install torch nmhit pyzag==2.0.0 scikit-build-core ninja
 ```
 
-`neml2` itself is intentionally **not** pinned in `environment.yml`: the PyPI `neml2` wheel hard-pins `pyzag==1.1.4`, which conflicts with the `pyzag==2.0.0` this stack requires. NEML2 (v3, pyzag-v2 compatible) is instead built from the `neml2/` submodule and pip-installed `--no-deps` into this environment by the MOOSE build step below (`update_and_rebuild_neml2.sh`), which also provides the C++ library MOOSE links against — so the C++ and Python NEML2 stay in lockstep.
+`torch` and `nmhit` are resolved by CMake at NEML2 configure time, so they must be installed first. `neml2` itself is built from the `neml2/` submodule and pip-installed `--no-deps` by the MOOSE build step below, keeping the C++ library and Python `neml2` in lockstep.
 
-> **pyzag note.** The material-calibration examples drive NEML2 3.0.7 through pyzag's adjoint, which needs the pyzag **v2 operators abstraction** (`pyzag.operators`, `pyzag.chunktime.BidiagonalPCRFactorization`) matching the `neml2/` submodule. This lives on the `hdt5kt/pyzag` fork; make sure the environment's `pyzag` provides `pyzag.operators` (a plain PyPI `pyzag` may not). The exact fork branch used for development still needs to be pushed to `hdt5kt/pyzag` for a fully reproducible install.
+> **pyzag.** The material-calibration examples use pyzag's adjoint, which needs `pyzag` 2.0.0 (from `applied-material-modeling/pyzag`) for its `pyzag.operators` abstraction. The drivers use `neml2.pyzag.NEML2PyzagModel` — construct it, then call `neml2.compile(model)` for JIT.
 
 2. __MOOSE with NEML2__
 
-PUMA builds against __NEML2 v3 (with the pyzag v2 port)__. The exact versions are pinned as git submodules:
+PUMA builds against __NEML2 v3 (upstream `main`)__. The exact versions are pinned as git submodules:
 
 - MOOSE: `https://github.com/hugary1995/moose.git` @ `neml2-v3-migration` → submodule `moose/`
-- NEML2: `https://github.com/hdt5kt/neml2.git` @ `pyzag_v3_port` → submodule `neml2/`
+- NEML2: `https://github.com/applied-material-modeling/neml2.git` @ `main` → submodule `neml2/`
 
 Clone PUMA and populate the two submodules at their pinned commits:
 
@@ -75,9 +81,13 @@ Here are the resources to successfully compile MOOSE with NEML2
 
 __Instructions__: at least worked for `Ubuntu 20.04` with the appropriate `mpi` and compiler packages. Check the above websites for prerequisites and dependencies.
 
-> **Two environments.** `environment.yml` (`graintrace_env`) is the *analysis/runtime* env (pyzag, plotting, calibration). It does **not** contain the toolchain needed to *build* MOOSE. Build MOOSE + NEML2 + PUMA in a separate **MOOSE build environment** that provides a self-consistent conda toolchain — MPI + compilers + build libs: `mpich`, `gcc_linux-64`, `gxx_linux-64`, `gfortran_linux-64`, `cmake`, `make`, `ninja`, `hdf5`, `netcdf4`, `zlib`, `libaec`, `bison`, `flex`, `m4`, `pkg-config` (this mirrors MOOSE's own dev env). Do not rely on system compilers/MPI — a machine may lack a matching `gfortran`, and mixing conda + system toolchains fails to link.
+### General installation on Linux (CPU)
 
-- With that build environment active and the submodules populated, build MOOSE's PETSc, libMesh, and WASP from the `moose/` submodule (the conda `mpicc`/`mpicxx`/`mpif90` wrappers use the conda compilers):
+The steps below build the full CPU stack (PETSc → libMesh → WASP → NEML2 → PUMA) on a generic Linux workstation. For GPU acceleration on an NVIDIA HPC cluster, do this first, then read [Building on an NVIDIA HPC cluster (GPU)](#building-on-an-nvidia-hpc-cluster-gpu) for the deltas.
+
+Activate the `puma` environment from step 1 — it carries the conda toolchain (MPI, compilers, build libs) and NEML2's dependencies, so the same environment builds and runs the stack. Using the conda `mpicc`/`mpicxx`/`mpif90` wrappers keeps the compilers self-consistent.
+
+- With the environment active and the submodules populated, build MOOSE's PETSc, libMesh, and WASP from the `moose/` submodule:
 
 ```bash
 export CC=mpicc CXX=mpicxx FC=mpif90 F90=mpif90 F77=mpif77
@@ -90,7 +100,7 @@ cd moose/scripts
 cd ../../
 ```
 
-- Build NEML2 for MOOSE and the python package, then configure MOOSE against it. `NEML2_SRC_DIR` points at the `neml2/` submodule (the `pyzag_v3_port` version, NEML2 3.0.7), overriding MOOSE's own pinned NEML2; it is pip-installed `--no-deps` into the active environment (so the C++ library and Python `neml2` stay in lockstep). Do **not** download a standalone libtorch and do **not** set `LIBTORCH_DIR` — that pins a mismatched libtorch. Build NEML2 first (it prints the exact `./configure` line to run), then configure with **explicit** `--with-neml2` / `--with-libtorch` paths pointing at the conda site-packages (bare `--with-libtorch` does not reliably auto-discover the conda torch and can fall back to an empty path):
+- Build NEML2 for MOOSE and the Python package, then configure MOOSE against it. `NEML2_SRC_DIR` points at the `neml2/` submodule (upstream `applied-material-modeling/neml2` `main`) and overrides MOOSE's own pinned NEML2; it is pip-installed `--no-deps` into the active environment, keeping the C++ library and Python `neml2` in lockstep. The build links the `torch` already in your environment. Build NEML2 first — it prints the exact `./configure` line — then configure with explicit `--with-neml2` / `--with-libtorch` paths into the conda site-packages:
 
 ```bash
 export NEML2_SRC_DIR=${PWD}/neml2
@@ -135,3 +145,44 @@ Each example under `examples/` carries a `*_scripts.py` that compiles the models
 ```
 
 If all tests pass, the build is complete.
+
+### Building on an NVIDIA HPC cluster (GPU)
+
+Do the full [General installation on Linux (CPU)](#general-installation-on-linux-cpu) build first, then apply the deltas below to add GPU support. The MOOSE/PETSc/libMesh/WASP/NEML2/PUMA build itself is unchanged — GPU support comes from (a) a CUDA-enabled `torch` and (b) compiling the NEML2 material models for the `cuda` device.
+
+1. __Load the cluster toolchain (modules).__ Load a compiler + MPI stack and, importantly, a **CUDA toolkit** — the CUDA AOTI export in step 4 needs `nvcc` on `PATH` (or `CUDA_HOME` pointing at a full toolkit; a runtime-only CUDA install without `nvcc` is not enough). On Cray/HPE systems the Cray wrappers (`cc`/`CC`/`ftn`, which wrap the loaded GNU compilers + `cray-mpich`) work for the MOOSE build; otherwise the conda `mpicc`/`mpicxx`/`mpif90` wrappers used in the CPU steps are fine.
+
+```bash
+module load cuda            # provides nvcc (name varies by site: cuda, cudatoolkit, nvhpc, ...)
+module load gcc cray-mpich  # or your site's compiler + MPI (skip if using the conda toolchain)
+export CUDA_HOME=${CUDA_HOME:-$(dirname "$(dirname "$(command -v nvcc)")")}
+```
+
+2. __Install a CUDA-matched `torch`__ in the build/analysis environment. NEML2's Python package (and thus PUMA) links whatever `torch` is active, so this single choice makes the whole stack GPU-capable. Match the wheel's CUDA build to the cluster driver — CUDA minor-version compatibility applies, so a `cu126` wheel runs on a CUDA 12.x driver, but a wheel newer than the driver (e.g. `cu130` on a 12.x driver) will report `torch.cuda.is_available() == False`:
+
+```bash
+pip install torch==2.12.1+cu126 --index-url https://download.pytorch.org/whl/cu126
+python -c "import torch; print(torch.__version__, torch.cuda.is_available())"   # expect True
+```
+
+   Then run the CPU build steps (PETSc → libMesh → WASP → NEML2 → configure → `make`) unchanged — they link this `torch`. On many clusters PETSc must be built on a **compute node**; submit the `update_and_rebuild_*.sh` steps through the scheduler if a login-node build fails.
+
+3. __Verify GPU visibility on a compute node.__ Grab an interactive GPU node (e.g. `salloc --gres=gpu:1 ...` / `srun ...`) and re-check `torch.cuda.is_available()` there — login nodes usually have no GPU.
+
+4. __Compile the NEML2 material models for the GPU__ (this is the step that differs from the CPU build). Pass `--device cpu cuda` so both artifacts are baked; the `cuda` export invokes `nvcc`. Use a **plain host `g++`/`gcc`** for the inductor/AOTI C++ step — not the MPI or Cray compiler wrapper, which torch-inductor mis-handles:
+
+```bash
+cd neml2_models
+export CC=gcc CXX=g++                       # bare host compiler for AOTI (NOT mpicxx / CC)
+for m in infiltration_1d infiltration_2d pyrolysis_1d pyrolysis_2d \
+         solidification_1d solidification_2d solid_mechanics solid_mechanics_pressure; do
+  neml2-compile --model model models/$m.i \
+    --dtype float64 --device cpu cuda \
+    --output-dir aoti/$m --load python -d ":"
+done
+cd ..
+```
+
+   If `nvcc` is not available on your cluster, omit `cuda` (use `--device cpu`) — the CPU artifacts are all that CPU runs need.
+
+5. __Run on the GPU.__ Point the model at the `cuda` device: in a MOOSE input set `device = cuda` in the `[NEML2]` block, and in the `examples/**/*_scripts.py` drivers set `DEVICES = ["cpu", "cuda"]` (compile) and the run device accordingly. Launch on GPU nodes through the scheduler (e.g. SLURM `--gres=gpu:N`, one MPI rank per GPU).

@@ -183,7 +183,6 @@ n = 1000
   input = '../../../../neml2_models/aoti/infiltration_1d/model_aoti.i'
   [all]
     model = 'model'
-    verbose = true
     device = 'cpu'
 
     # Inputs/outputs auto-map by name: phif -> VARIABLE; t -> TIME; phip, phis

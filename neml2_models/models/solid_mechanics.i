@@ -41,11 +41,12 @@ mu = 0.3
         type = R2Multiplication
         A = 'deformation_gradient'
         B = 'pk2'
-        to = 'pk1_stress'
+        to = 'neml2_pk1'
         invert_B = false
     []
     [model]
         type = ComposedModel
         models = 'Jacobian Jtotal totalF green_strain S_pk2 S_pk2_R2 S_pk1'
+        additional_outputs = 'pk2'
     []
 []

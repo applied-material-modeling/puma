@@ -280,7 +280,7 @@ delta_Omega = 0.08438818565400843  # omega_Si_s/omega_Si_l - 1
         type = R2Multiplication
         A = 'deformation_gradient'
         B = 'pk2'
-        to = 'pk1_stress'
+        to = 'neml2_pk1'
         invert_B = false
     []
     [model_sm]
@@ -288,6 +288,7 @@ delta_Omega = 0.08438818565400843  # omega_Si_s/omega_Si_l - 1
         models = 'Jacobian cap Jtotal totalF green_strain phisp S_pk2_e S_pk2_e_R2
                     eps_v rve_sh S_pk2_h
                     S_pk2 S_pk1 phif_s'
+        additional_outputs = 'pk2'
     []
     [M1]
         type = ScalarLinearCombination
@@ -352,6 +353,6 @@ delta_Omega = 0.08438818565400843  # omega_Si_s/omega_Si_l - 1
         models = 'Jacobian phif_s perm cap rhocp kappa_eff phif_max
                     nonliquid phifl_dot phif_max_switch model_sm
                   M1 M3 M4 M5 M6 M7 M8 M9 M10 M11'
-        additional_outputs = 'phif_s perm'
+        additional_outputs = 'phif_s perm pk2'
     []
 []

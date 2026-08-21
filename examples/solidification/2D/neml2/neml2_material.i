@@ -1,36 +1,36 @@
-cp_rhofl = 17990000.0          # cp_Si*rho_Si
-cp_rhofs = 11850000.0          # cp_Si_s*rho_Si_s
-cp_rhos = 33900000.0           # cp_C*rho_C
-cp_rhop = 17655000.0           # cp_SiC*rho_SiC
-kap_fl = 14000000.0            # kappa_Si
-kap_fs = 14000000.0            # kappa_Si_s
-kap_s = 300000000.0            # kappa_C
-kap_p = 30000000.0             # kappa_SiC
+cp_rhofl = 17990000.0  # cp_Si*rho_Si
+cp_rhofs = 11850000.0  # cp_Si_s*rho_Si_s
+cp_rhos = 33900000.0  # cp_C*rho_C
+cp_rhop = 17655000.0  # cp_SiC*rho_SiC
+kap_fl = 14000000.0  # kappa_Si
+kap_fs = 14000000.0  # kappa_Si_s
+kap_s = 300000000.0  # kappa_C
+kap_p = 30000000.0  # kappa_SiC
 Ts = 1687
-Tl = 1707                      # Tf
+Tl = 1707  # Tf
 inv_1pdw = 0.9221789883268482  # 1/(1+delta_Omega) = rho_Si_s/rho_Si = 2.37/2.57
 one_plus_dw = 1.0843881856540084  # 1+delta_Omega = rho_Si/rho_Si_s
 neg_inv_1pdw = -0.9221789883268482 # -1/(1+delta_Omega)
-mOfs_Ofl = -1.0843881856540084 # -omega_Si_s/omega_Si_l = -(rho_Si/rho_Si_s)
+mOfs_Ofl = -1.0843881856540083  # -omega_Si_s/omega_Si_l = -(rho_Si/rho_Si_s)
 brooks_corey_threshold = 10000.0
 capillary_pressure_power = 10
-kk_L = 1e-8                    # kk_Si
+kk_L = 1e-08  # kk_Si
 permeability_power = 8
-rho_f = 2.57                   # rho_Si
-rhof_nu = 257.0               # rho_Si/mu_Si
-rhof2_nu = 660.49             # rho_Si^2/mu_Si
-hf_rhof_onu = 4600300000000.0  # H_latent*rho_Si/mu_Si  (H_latent=1.79e10 erg/g, physical L_Si)
-hf_rhof2_onu = 11822771000000.0 # H_latent*rho_Si^2/mu_Si
-mhf_rhof = -46003000000.0      # -H_latent*rho_Si
-therm_expansion = 1e-6
+rho_f = 2.57  # rho_Si
+rhof_nu = 257.0  # rho_Si/mu_Si
+rhof2_nu = 660.4899999999999  # rho_Si^2/mu_Si
+hf_rhof_onu = 30840000000.0  # H_latent*rho_Si/mu_Si  (H_latent=1.79e10 erg/g, physical L_Si)
+hf_rhof2_onu = 79258799999.99998  # H_latent*rho_Si^2/mu_Si
+mhf_rhof = -308400000.0  # -H_latent*rho_Si
+therm_expansion = 1e-06
 T0 = 300
 Tmax = 1720
-E = 400e9
-E_fs = 160e9                   # E_Si
-E_m = 400e9                    # E_C
-nu_fs = 0.3                    # nu_Si
-nu_m = 0.3                     # nu_C
-delta_Omega = 0.08438818565400843  # omega_Si_s/omega_Si_l - 1
+E = 400000000000.0
+E_fs = 160000000000.0  # E_Si
+E_m = 400000000000.0  # E_C
+nu_fs = 0.3  # nu_Si
+nu_m = 0.3  # nu_C
+delta_Omega = 0.0843881856540083  # omega_Si_s/omega_Si_l - 1
 
 [Models]
     [Jacobian]
@@ -282,7 +282,7 @@ delta_Omega = 0.08438818565400843  # omega_Si_s/omega_Si_l - 1
         type = R2Multiplication
         A = 'deformation_gradient'
         B = 'pk2'
-        to = 'pk1_stress'
+        to = 'neml2_pk1'
         invert_B = false
     []
     [model_sm]
@@ -290,6 +290,7 @@ delta_Omega = 0.08438818565400843  # omega_Si_s/omega_Si_l - 1
         models = 'Jacobian cap Jtotal totalF green_strain phisp S_pk2_e S_pk2_e_R2
                     eps_v rve_sh S_pk2_h
                     S_pk2 S_pk1 phif_s'
+        additional_outputs = 'pk2'
     []
     [M1]
         type = ScalarLinearCombination
@@ -354,6 +355,6 @@ delta_Omega = 0.08438818565400843  # omega_Si_s/omega_Si_l - 1
         models = 'Jacobian phif_s perm cap rhocp kappa_eff phif_max
                     nonliquid phifl_dot phif_max_switch model_sm
                   M1 M3 M4 M5 M6 M7 M8 M9 M10 M11'
-        additional_outputs = 'phif_s perm'
+        additional_outputs = 'phif_s perm pk2'
     []
 []

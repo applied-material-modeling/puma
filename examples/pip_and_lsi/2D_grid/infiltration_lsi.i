@@ -183,13 +183,12 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
   input = 'neml2/aoti_reactive_flow/model_aoti.i'
   [all]
     model = 'model'
-    verbose = true
     device = 'cpu'
 
     derivatives = 'M1 deformation_gradient dM1dF; M2 phif dM2dphif; M3 phif dM3dphif;
                    M4 phif dM4dphif; M5 phif dM5dphif; M6 phif dM6dphif;
                    M7 phif dM7dphif; M7 deformation_gradient dM7dF; M8 phif dM8dphif;
-                   pk1_stress T dpk1dT; pk1_stress deformation_gradient pk1_jacobian;
+                   neml2_pk1 T dpk1dT; pk2_stress deformation_gradient dpk2_dF;
                    phis phif dphisdphif; phiptotal phif dphiptotaldphif'
 
     initialize_outputs = '      phip     phis'
@@ -226,6 +225,12 @@ new_scale = '${fparse (transition_saturation_back-transition_saturation_back_sta
     type = GenericConstantRankTwoTensor
     tensor_name = 'zeroR2'
     tensor_values = '0 0 0 0 0 0 0 0 0'
+  []
+  [stress]
+    type = ComputeLagrangianStressCustomPK2
+    custom_pk2_stress = 'pk2_stress'
+    custom_pk2_jacobian = 'dpk2_dF'
+    large_kinematics = true
   []
   [convection]
     type = ADParsedMaterial

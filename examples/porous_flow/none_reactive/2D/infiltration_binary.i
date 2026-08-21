@@ -113,7 +113,6 @@ gravity = 980.665
   input = 'neml2/aoti/model_aoti.i'
   [all]
     model = 'model'
-    verbose = true
     device = 'cpu'
 
     derivatives = 'M5 phif dM5dphif; M4 phif dM4dphif; M3 phif dM3dphif'

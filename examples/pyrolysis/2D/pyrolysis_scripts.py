@@ -15,7 +15,7 @@ AOTI_STUB = HERE / "neml2" / "aoti" / "model_aoti.i"
 
 CORES = 4
 RECOMPILE = False
-DEVICES = ["cpu", "cuda"]
+DEVICES = ["cpu"]
 
 MATERIAL = {
     "rho_s": 2100.0,
@@ -127,7 +127,7 @@ def compile_model():
             "neml2-compile", "--model", "model", "neml2_material.i",
             "--dtype", "float64", "--device", *DEVICES, "--output-dir", "aoti",
             "-d", "M1:T", "-d", "M2:T", "-d", "M3:T",
-            "-d", "pk1_stress:T", "-d", "pk1_stress:deformation_gradient",
+            "-d", "neml2_pk1:T", "-d", "pk2:deformation_gradient",
         ],
         cwd=str(HERE / "neml2"),
         env=env,

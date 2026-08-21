@@ -85,7 +85,6 @@ xmax = 2.0
     input = '../../../../neml2_models/aoti/pyrolysis_1d/model_aoti.i'
     [all]
         model = 'model'
-        verbose = true
         device = 'cpu'
 
         derivatives = 'M3 T dM3dT; M1 T dM1dT; M2 T dM2dT'

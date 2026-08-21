@@ -160,7 +160,6 @@ n = 1000
   input = 'neml2/aoti_infiltration/model_aoti.i'
   [all]
     model = 'model'
-    verbose = true
     device = 'cpu'
 
     derivatives = 'M6 phif dM6dphif; M3 phif dM3dphif; M4 phif dM4dphif;

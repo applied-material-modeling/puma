@@ -4,5 +4,5 @@
 	branch = neml2-v3-migration
 [submodule "neml2"]
 	path = neml2
-	url = https://github.com/hdt5kt/neml2.git
-	branch = pyzag_v3_port
+	url = https://github.com/applied-material-modeling/neml2.git
+	branch = main

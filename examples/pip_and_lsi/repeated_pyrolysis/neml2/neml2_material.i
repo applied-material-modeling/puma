@@ -256,7 +256,7 @@ cphiop = 0.8
         type = R2Multiplication
         A = 'deformation_gradient'
         B = 'pk2_stress'
-        to = 'pk1_stress'
+        to = 'neml2_pk1'
         invert_B = false
     []
     [model_sm]
@@ -269,7 +269,7 @@ cphiop = 0.8
     [model]
         type = ComposedModel
         models = 'model_solver elout model_sm'
-        additional_outputs = 'phiop alpha wb ws wgcp V'
+        additional_outputs = 'phiop alpha wb ws wgcp V pk2_stress'
     []
     #######################################################################################
 []

@@ -5,8 +5,8 @@
 #
 # PUMA pins the exact versions it builds against as git submodules:
 #
-#   MOOSE  : https://github.com/hugary1995/moose.git   @ neml2-v3-migration   -> moose/
-#   NEML2  : https://github.com/hdt5kt/neml2.git        @ pyzag_v3_port         -> neml2/
+#   MOOSE  : https://github.com/hugary1995/moose.git              @ neml2-v3-migration -> moose/
+#   NEML2  : https://github.com/applied-material-modeling/neml2.git @ main               -> neml2/
 #
 # A fresh `git clone --recurse-submodules` already populates both. This helper is for
 # checkouts cloned without --recurse-submodules, and to run the NEML2 build step that

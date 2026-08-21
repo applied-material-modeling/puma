@@ -66,11 +66,10 @@ total_time = '${fparse theat + tcool*3600}'
     input = 'neml2/aoti_curing/model_aoti.i'
     [all]
         model = 'model'
-        verbose = true
         device = 'cpu'
 
         derivatives = 'M3 T dM3dT; M1 T dM1dT; M2 T dM2dT;
-                       pk1_stress T dpk1dT; pk1_stress deformation_gradient pk1_jacobian'
+                       neml2_pk1 T dpk1dT; pk2_stress deformation_gradient dpk2_dF'
 
         initialize_outputs = '      alpha'
         initialize_output_values = 'alpha0'
@@ -87,6 +86,12 @@ total_time = '${fparse theat + tcool*3600}'
         type = GenericConstantRankTwoTensor
         tensor_name = 'zeroR2'
         tensor_values = '0 0 0 0 0 0 0 0 0'
+    []
+    [stress]
+      type = ComputeLagrangianStressCustomPK2
+      custom_pk2_stress = 'pk2_stress'
+      custom_pk2_jacobian = 'dpk2_dF'
+      large_kinematics = true
     []
     [convection]
         type = ADParsedMaterial

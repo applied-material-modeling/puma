@@ -1,7 +1,7 @@
 rho_f = 2.0
 E = 500
 nu = 0.3
-kk_L = 2e-5
+kk_L = 2e-05
 permeability_power = 3
 rhof_nu = 0.2
 rhof2_nu = 0.4
@@ -10,7 +10,7 @@ hf_rhof2_nu = 4000000.0
 brooks_corey_threshold = 10000.0
 capillary_pressure_power = 3
 Tref = 300
-therm_expansion = 1e-4
+therm_expansion = 0.0001
 
 [Models]
     ## solid mechanics ----------------------------------------------------------
@@ -75,18 +75,19 @@ therm_expansion = 1e-4
         type = R2Multiplication
         A = 'deformation_gradient'
         B = 'pk2'
-        to = 'pk1_stress'
+        to = 'neml2_pk1'
         invert_B = false
     []
     [model_pk1]
         type = ComposedModel
         models = 'fluid_JF Jtotal
                   Fthermal totalF green_strain S_pk2 S_pk2_R2 S_pk1'
-        additional_outputs = 'Jf Jt'
+        additional_outputs = 'Jf Jt pk2 neml2_pk1'
     []
     [model_sm]
         type = ComposedModel
         models = 'Jacobian M1 model_pk1'
+        additional_outputs = 'pk2 neml2_pk1'
     []
     ############################################################
     [stress_induce_pressure]
@@ -95,7 +96,7 @@ therm_expansion = 1e-4
         js = 'Jf'
         jt = 'Jt'
         deformation_gradient = 'deformation_gradient'
-        pk1_stress = 'pk1_stress'
+        pk1_stress = 'neml2_pk1'
         advective_stress = 'Ps'
     []
     [stress_scale]
@@ -105,7 +106,7 @@ therm_expansion = 1e-4
     []
     [advective_stress]
         type = ComposedModel
-        models = 'model_pk1 stress_scale stress_induce_pressure'
+        models = 'stress_scale stress_induce_pressure'
     []
     #################################################################
     ## porous flow -----------------------------------------------------------------
@@ -193,5 +194,6 @@ therm_expansion = 1e-4
     [model]
         type = ComposedModel
         models = 'model_sm model_porousflow'
+        additional_outputs = 'pk2 neml2_pk1'
     []
 []

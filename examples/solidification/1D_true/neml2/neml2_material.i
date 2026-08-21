@@ -17,9 +17,9 @@ permeability_power = 8
 rho_f = 2.57  # rho_Si
 rhof_nu = 257.0  # rho_Si/mu_Si
 rhof2_nu = 660.4899999999999  # rho_Si^2/mu_Si
-hf_rhof_onu = 4600300000000.0  # H_latent*rho_Si/mu_Si (H_latent=1.79e10 erg/g, physical L_Si)
-hf_rhof2_onu = 11822771000000.0  # H_latent*rho_Si^2/mu_Si
-mhf_rhof = -46003000000.0  # -H_latent*rho_Si
+hf_rhof_onu = 30840000000.0  # H_latent*rho_Si/mu_Si (H_latent=1.79e10 erg/g, physical L_Si)
+hf_rhof2_onu = 79258799999.99998  # H_latent*rho_Si^2/mu_Si
+mhf_rhof = -308400000.0  # -H_latent*rho_Si
 
 # 1D_true: explicit lever kinetics; phif_s integrated (ForwardEuler), phifl_dot =
 # phif_avail*(g(T^n)-g(T^{n-1}))/dt with phif_avail = phif + phif_s~1/(1+dOmega).

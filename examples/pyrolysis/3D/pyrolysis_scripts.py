@@ -17,7 +17,7 @@ AOTI_STUB = HERE / "neml2" / "aoti" / "model_aoti.i"
 
 CORES = 12
 RECOMPILE = False
-DEVICES = ["cpu", "cuda"]
+DEVICES = ["cpu"]
 
 MESH_FILE = "gold/SiC_core.msh"
 NUM_EL = 50
@@ -148,9 +148,9 @@ def compile_model():
             "-d",
             "M3:T",
             "-d",
-            "pk1_stress:T",
+            "neml2_pk1:T",
             "-d",
-            "pk1_stress:deformation_gradient",
+            "pk2:deformation_gradient",
         ],
         cwd=str(HERE / "neml2"),
         env=env,

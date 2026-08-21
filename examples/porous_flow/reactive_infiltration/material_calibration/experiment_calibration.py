@@ -26,7 +26,7 @@ import pandas as pd
 import torch
 import tqdm
 from matplotlib import pyplot as plt
-from neml2.pyzag import NEML2PyzagFactory
+from neml2.pyzag import NEML2PyzagModel
 from pyzag import chunktime, nonlinear, reparametrization
 
 _pkg = Path(__file__).resolve().parents[4] / "neml2_models" / "python"
@@ -163,7 +163,8 @@ def main():
     pred_time = time[:, 0] / 60.0
 
     nsys = neml2.load_nonlinear_system("SiCgrowth.i", "eq_sys")
-    factory = NEML2PyzagFactory(nsys, include_parameters=CALIBRATION_PARAMS, compile=True)
+    factory = NEML2PyzagModel(nsys, include_parameters=CALIBRATION_PARAMS)
+    neml2.compile(factory)
     factory.to(device=device)
     with torch.no_grad():
         for name, value in INITIAL.items():

@@ -16,10 +16,10 @@ SOLID_MODEL = HERE / "neml2" / "neml2_solidification.i"
 REACTIVE_STUB = HERE / "neml2" / "aoti_reactive" / "model_aoti.i"
 SOLID_STUB = HERE / "neml2" / "aoti_solidification" / "model_aoti.i"
 
-CORES = 22
+CORES = 6
 RECOMPILE = False
 RUN_INFILTRATION = False
-DEVICES = ["cpu", "cuda"]
+DEVICES = ["cpu"]
 
 num_el_x = 51
 num_el_y = 101

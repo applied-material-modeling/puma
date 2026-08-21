@@ -288,7 +288,7 @@ delta_Omega = 0.08438818565400852
         type = R2Multiplication
         A = 'deformation_gradient'
         B = 'pk2_stress'
-        to = 'pk1_stress'
+        to = 'neml2_pk1'
         invert_B = false
     []
     [model_sm]
@@ -363,6 +363,6 @@ delta_Omega = 0.08438818565400852
         models = 'Jacobian phif_s perm cap rhocp kappa_eff phif_max
                     nonliquid phifl_dot phif_max_switch model_sm
                   M1 M3 M4 M5 M6 M7 M8 M9 M10 M11'
-        additional_outputs = 'phif_s perm'
+        additional_outputs = 'phif_s perm pk2_stress'
     []
 []

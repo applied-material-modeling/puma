@@ -85,7 +85,7 @@ capillary_pressure_power = 8
         type = R2Multiplication
         A = 'deformation_gradient'
         B = 'pk2_stress'
-        to = 'pk1_stress'
+        to = 'neml2_pk1'
         invert_B = false
     []
     [model_pk1]
@@ -97,6 +97,7 @@ capillary_pressure_power = 8
     [model_sm]
         type = ComposedModel
         models = 'Jacobian M1 model_pk1'
+        additional_outputs = 'pk2_stress'
     []
     ############################################################
     [stress_induce_pressure]
@@ -105,7 +106,7 @@ capillary_pressure_power = 8
         js = 'Jf'
         jt = 'Jt'
         deformation_gradient = 'deformation_gradient'
-        pk1_stress = 'pk1_stress'
+        pk1_stress = 'neml2_pk1'
         advective_stress = 'Ps'
     []
     [stress_scale]
@@ -197,6 +198,6 @@ capillary_pressure_power = 8
     [model]
         type = ComposedModel
         models = 'model_sm model_porousflow'
-        additional_outputs = 'pk1_stress'
+        additional_outputs = 'neml2_pk1 pk2_stress'
     []
 []

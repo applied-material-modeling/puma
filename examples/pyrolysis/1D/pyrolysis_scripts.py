@@ -15,7 +15,7 @@ AOTI_STUB = HERE / "neml2" / "aoti" / "model_aoti.i"
 
 CORES = 4
 RECOMPILE = False
-DEVICES = ["cpu", "cuda"]
+DEVICES = ["cpu"]
 
 MATERIAL = {
     "rho_s": 2100.0,

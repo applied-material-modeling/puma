@@ -152,12 +152,11 @@ total_time = '${fparse theat + tcool*3600}'
     input = 'neml2/aoti_infiltration/model_aoti.i'
     [all]
         model = 'model'
-        verbose = true
         device = 'cpu'
 
         derivatives = 'M5 phif dM5dphif; M1 deformation_gradient dM1dF;
-                       pk1_stress deformation_gradient pk1_jacobian;
-                       pk1_stress T dpk1dT;
+                       pk2_stress deformation_gradient dpk2_dF;
+                       neml2_pk1 T dpk1dT;
                        M4 phif dM4dphif; M9 phif dM9dphif'
     []
 []
@@ -183,6 +182,12 @@ total_time = '${fparse theat + tcool*3600}'
         type = GenericConstantRankTwoTensor
         tensor_name = 'zeroR2'
         tensor_values = '0 0 0 0 0 0 0 0 0'
+    []
+    [stress]
+      type = ComputeLagrangianStressCustomPK2
+      custom_pk2_stress = 'pk2_stress'
+      custom_pk2_jacobian = 'dpk2_dF'
+      large_kinematics = true
     []
     # phif_max (maximum fluid fraction) is the pyrolysis open porosity carried in
     # as material 'void' (from initial_condition_from_exodus_3.i). NEML2 gathers it

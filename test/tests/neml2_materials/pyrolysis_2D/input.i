@@ -133,11 +133,10 @@ htc = 200 #Wm-2K assume air doesnt move much
     input = '../../../../neml2_models/aoti/pyrolysis_2d/model_aoti.i'
     [all]
         model = 'model'
-        verbose = true
         device = 'cpu'
 
         derivatives = 'M3 T dM3dT; M1 T dM1dT; M2 T dM2dT;
-                       pk1_stress T dpk1dT; pk1_stress deformation_gradient pk1_jacobian'
+                       neml2_pk1 T dpk1dT; pk2 deformation_gradient dpk2_dF'
 
         initialize_outputs = '      wb  wgcp  ws  alpha  phiop'
         initialize_output_values = 'wb0 wgcp0 ws0 alpha0 phiop0'
@@ -149,6 +148,12 @@ htc = 200 #Wm-2K assume air doesnt move much
         type = GenericConstantRankTwoTensor
         tensor_name = 'zeroR2'
         tensor_values = '0 0 0 0 0 0 0 0 0'
+    []
+    [stress]
+        type = ComputeLagrangianStressCustomPK2
+        custom_pk2_stress = 'pk2'
+        custom_pk2_jacobian = 'dpk2_dF'
+        large_kinematics = true
     []
     [init_mat]
         type = GenericConstantMaterial

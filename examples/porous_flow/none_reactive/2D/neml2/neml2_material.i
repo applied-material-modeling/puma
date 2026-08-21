@@ -1,7 +1,7 @@
-kk_L = 2e-5
+kk_L = 2e-05
 permeability_power = 3
 rhof_nu = 0.257
-rhof2_nu = 0.66049
+rhof2_nu = 0.6604899999999999
 brooks_corey_threshold = 100000.0
 capillary_pressure_power = 3
 

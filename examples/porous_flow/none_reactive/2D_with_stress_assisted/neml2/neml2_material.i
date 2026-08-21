@@ -2,7 +2,7 @@ rho_f = 2.0
 swelling_coefficient = 0.1
 E = 500
 nu = 0.3
-kk_L = 2e-5
+kk_L = 2e-05
 permeability_power = 3
 rhof_nu = 0.2
 rhof2_nu = 0.4
@@ -57,17 +57,19 @@ capillary_pressure_power = 3
         type = R2Multiplication
         A = 'deformation_gradient'
         B = 'pk2'
-        to = 'pk1_stress'
+        to = 'neml2_pk1'
         invert_B = false
     []
     [model_pk1]
         type = ComposedModel
         models = 'fluid_F total_F
          green_strain S_pk2 S_pk2_R2 S_pk1'
+        additional_outputs = 'pk2 neml2_pk1'
     []
     [model_sm]
         type = ComposedModel
         models = 'model_pk1'
+        additional_outputs = 'pk2 neml2_pk1'
     []
     ############################################################
     [stress_induce_pressure]
@@ -75,7 +77,7 @@ capillary_pressure_power = 3
         coefficient = 10.0 #'${swelling_coefficient}'
         js = 'Jf'
         deformation_gradient = 'deformation_gradient'
-        pk1_stress = 'pk1_stress'
+        pk1_stress = 'neml2_pk1'
         advective_stress = 'Ps'
     []
     [stress_scale]
@@ -85,7 +87,7 @@ capillary_pressure_power = 3
     []
     [advective_stress]
         type = ComposedModel
-        models = 'model_pk1 fluid_F stress_scale stress_induce_pressure'
+        models = 'fluid_F stress_scale stress_induce_pressure'
     []
     #################################################################
     ## porous flow -----------------------------------------------------------------
@@ -161,5 +163,6 @@ capillary_pressure_power = 3
     [model]
         type = ComposedModel
         models = 'model_sm model_porousflow'
+        additional_outputs = 'pk2 neml2_pk1'
     []
 []

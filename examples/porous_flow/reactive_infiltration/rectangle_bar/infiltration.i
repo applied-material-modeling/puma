@@ -184,7 +184,6 @@ levelset_smooth_transistion = 0.1
     input = 'neml2/aoti/model_aoti.i'
     [all]
         model = 'model'
-        verbose = true
         device = 'cpu'
 
         derivatives = 'M6 phif dM6dphif; M3 phif dM3dphif; M4 phif dM4dphif;

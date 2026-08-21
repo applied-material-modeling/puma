@@ -201,7 +201,6 @@ gravity = 0.0 # cm/s2
     input = 'neml2/aoti/model_aoti.i'
     [all]
         model = 'model'
-        verbose = true
         device = 'cpu'
 
         derivatives = 'M1 deformation_gradient dM1dF;
@@ -211,8 +210,8 @@ gravity = 0.0 # cm/s2
                        M8 T dM8dT; M8 phif dM8dphif;
                        M9 T dM9dT; M10 T dM10dT;
                        M11 T dM11dT; M11 phif dM11dphif; M11 deformation_gradient dM11dF;
-                       pk1_stress T dpk1dT; pk1_stress phif dpk1dphif;
-                       pk1_stress deformation_gradient pk1_jacobian;
+                       neml2_pk1 T dpk1dT; neml2_pk1 phif dpk1dphif;
+                       pk2 deformation_gradient dpk2_dF;
                        M3 phif dM3dphif; M4 phif dM4dphif; M5 phif dM5dphif;
                        M9 phif dM9dphif; M10 phif dM10dphif;
                        nonliquid phif dnonliquiddphif'
@@ -227,6 +226,12 @@ gravity = 0.0 # cm/s2
         type = GenericConstantRankTwoTensor
         tensor_name = 'zeroR2'
         tensor_values = '0 0 0 0 0 0 0 0 0'
+    []
+    [stress]
+        type = ComputeLagrangianStressCustomPK2
+        custom_pk2_stress = 'pk2'
+        custom_pk2_jacobian = 'dpk2_dF'
+        large_kinematics = true
     []
     [parameters]
         type = GenericConstantMaterial

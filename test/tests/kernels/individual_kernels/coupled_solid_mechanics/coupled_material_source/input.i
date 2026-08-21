@@ -61,15 +61,14 @@
   input = '../../../../../../neml2_models/aoti/solid_mechanics/model_aoti.i'
   [all]
     model = 'model'
-    verbose = true
     device = 'cpu'
 
     input_types = 'VARIABLE MATERIAL'
     inputs      = 'T        deformation_gradient'
 
     derivatives = 'J          deformation_gradient neml2_dJdF;
-                   pk1_stress deformation_gradient pk1_jacobian;
-                   pk1_stress T                    neml2_dpk1dT'
+                   pk2 deformation_gradient dpk2_dF;
+                   neml2_pk1 T                    neml2_dpk1dT'
   []
 []
 
@@ -82,6 +81,12 @@
 []
 
 [Materials]
+  [stress]
+    type = ComputeLagrangianStressCustomPK2
+    custom_pk2_stress = 'pk2'
+    custom_pk2_jacobian = 'dpk2_dF'
+    large_kinematics = true
+  []
   [zeroR2]
     type = GenericConstantRankTwoTensor
     tensor_name = R20

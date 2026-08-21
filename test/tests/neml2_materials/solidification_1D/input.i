@@ -189,7 +189,6 @@ gravity = 980.665 # cm/s2
     input = '../../../../neml2_models/aoti/solidification_1d/model_aoti.i'
     [all]
         model = 'model'
-        verbose = true
         device = 'cpu'
 
         # Inputs/outputs auto-map by name (T, phif -> VARIABLE; t -> TIME;

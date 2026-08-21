@@ -263,17 +263,17 @@ o_Vref = 90.93222879364822            # 1/V0 (was MOOSE param Jvolume_c_0)
         type = R2Multiplication
         A = 'deformation_gradient'
         B = 'pk2'
-        to = 'pk1_stress'
+        to = 'neml2_pk1'
         invert_B = false
     []
     [model_sm]
         type = ComposedModel
         models = 'Jtotal Jvolume Jthermal totalF green_strain S_pk2 S_pk2_R2 S_pk1'
-        additional_outputs = 'Jv Jt'
+        additional_outputs = 'Jv Jt pk2'
     []
     [model]
         type = ComposedModel
         models = 'model_solver elout model_sm'
-        additional_outputs = 'phiop alpha wb ws wgcp'
+        additional_outputs = 'phiop alpha wb ws wgcp pk2'
     []
 []

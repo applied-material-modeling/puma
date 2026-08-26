@@ -5,4 +5,13 @@
     exodiff = 'input_out.e'
     requirement = 'Make sure output is the same.'
   []
+  [check_jacobian]
+    type = 'PetscJacobianTester'
+    input = 'input.i'
+    run_sim = True
+    ratio_tol = 1e-5
+    difference_tol = 1.0
+    cli_args = "Executioner/petsc_options_iname='-pc_type' Executioner/petsc_options_value='lu' Bounds/active=''"
+    requirement = 'The hand-coded Jacobian shall match the finite-difference Jacobian.'
+  []
 []

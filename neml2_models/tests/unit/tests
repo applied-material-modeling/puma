@@ -1,0 +1,9 @@
+[Tests]
+  [model_unit_tests]
+    # Verify every custom NEML2 model's value and first derivatives against the
+    # autograd oracle (ModelUnitTest directional JVPs). See run_model_unit_tests.py.
+    type = RunCommand
+    command = 'python run_model_unit_tests.py'
+    requirement = 'The PUMA custom NEML2 models shall reproduce their reference values and exact first derivatives.'
+  []
+[]

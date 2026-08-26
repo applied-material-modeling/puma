@@ -1,172 +1,195 @@
-import numpy as np
+# Copyright 2025, UChicago Argonne, LLC
+# All Rights Reserved
+# Software Name: PUMA: Powder Utilization Modeling Application
+# By: UChicago Argonne, LLC
+# OPEN SOURCE LICENSE (MIT)
+
+import os
 import subprocess
+from pathlib import Path
+
 from generate_random_field import generate_initial_conditions
 
-########################################## Input ##############################################
-##                                                                                           ##
-## Currently assumed the resin fully filled the open pores gas during polymer infiltration   ##
-## all of the gas managed to escaped, pores production based on the amount of initial binder ##
-## trapped gas production based on the porosity at the begining of the pyrolysis             ##
-##                                                                                           ##
-###############################################################################################
+HERE = Path(__file__).resolve().parent
+PUMA = HERE / ".." / ".." / ".." / "puma-opt"
+NEML2_MODEL = HERE / "neml2" / "neml2_material.i"
+AOTI_STUB = HERE / "neml2" / "aoti" / "model_aoti.i"
 
-save_folder = "main"
-corenum = 4  # number of cores used for simulation
-puma_run_file = "./../../../puma-opt"
+CORES = 12
+RECOMPILE = False
+DEVICES = ["cpu"]
+
+MESH_FILE = "gold/SiC_core.msh"
+NUM_EL = 50
+L = 0.04
+LC = 0.0015
+MIN_BINDER = 0.3
+MAX_BINDER = 0.8
 
 
-# rate of close pore relative to volume of produced gas
 def cp_to_wg_relation(volume_binder):
     return 0.001
 
 
-# portion of open pores as a function of binder consumed
 def op_to_binder_relation(v_nonreactants):
     return 0.8
 
 
-# gas density as a function of temperature and pressure
 def rho_g(T, P):
-    return 13  # kg m-3
+    return 13.0
 
 
-########################### parts and geometry information ####################################
-# geometry
-mesh_file = "gold/SiC_core.msh"
-reference_mass = 1.0  # reference mass
-num_el = 50
-L = 0.04  # m
+MATERIAL = {
+    "rho_s": 2260.0,
+    "rho_b": 1250.0,
+    "rho_p": 3210.0,
+    "rho_g": rho_g(1, 1),
+    "cp_s": 1592.0,
+    "cp_b": 1200.0,
+    "cp_p": 750.0,
+    "k_s": 150.0,
+    "k_b": 279.0,
+    "k_p": 380.0,
+    "A": 1.2727e14,
+    "Ea": 209015.7262,
+    "R": 8.31446261815324,
+    "hrp": 1.58e6,
+    "Y": 0.5534,
+    "order": 7.3528,
+    "pyro_mu": cp_to_wg_relation(1),
+    "zeta": op_to_binder_relation(1),
+    "Mref": 1.0,
+    "E": 400e9,
+    "g": 4e-6,
+    "Tref": 300.0,
+}
 
-# initial conditions, assumed a binary system (binder and particle) at the begining
-mode = "mass_fraction"
-min_binder = 0.3
-max_binder = 0.8
-lc = 0.0015
+MOOSE = {
+    "dt": 5.0,
+    "num_el": NUM_EL,
+    "L": L,
+    "T0": 300.0,
+    "Tmax": 1400.0,
+    "dTdt": 20.0,
+    "t_hold": 0.5,
+    "tcool": 0.5,
+    "htc": 200.0,
+}
 
-############################# material and reaction properties ################################
-##           Current properties are for phenolic resin inside SiC praticles                  ##
 
-# denisty kgm-3
-rho_s = 2260
-rho_b = 1250  # 1.2 and 1.4
-rho_p = 3210
+def neml2_constants(m):
+    Mref = m["Mref"]
+    return {
+        "A": m["A"],
+        "Ea": m["Ea"],
+        "R": m["R"],
+        "order": m["order"],
+        "mY": -m["Y"],
+        "mu": m["pyro_mu"],
+        "mzeta": -m["zeta"],
+        "Mref": Mref,
+        "rho_s": m["rho_s"],
+        "rho_b": m["rho_b"],
+        "rho_p": m["rho_p"],
+        "rho_g": m["rho_g"],
+        "rho_sm1M": Mref / m["rho_s"],
+        "rho_bm1M": Mref / m["rho_b"],
+        "rho_pm1M": Mref / m["rho_p"],
+        "rho_gm1M": Mref / m["rho_g"],
+        "cp_s": m["cp_s"],
+        "cp_b": m["cp_b"],
+        "cp_p": m["cp_p"],
+        "k_s": m["k_s"],
+        "k_b": m["k_b"],
+        "k_p": m["k_p"],
+        "source_coeff": -m["rho_s"] * m["hrp"],
+        "E": m["E"],
+        "g": m["g"],
+        "Tref": m["Tref"],
+    }
 
-# heat capacity Jkg-1K-1
-cp_s = 1592
-cp_b = 1200
-cp_p = 750
-cp_g = 1e-4
 
-# thermal conductivity W/m-1K-1
-k_s = 150
-k_b = 279
-k_p = 380  # 120 and 490
-k_g = 1e-4
+def write_neml2_header(path, params):
+    out, in_header = [], True
+    for line in path.read_text().splitlines():
+        if line.lstrip().startswith("["):
+            in_header = False
+        stripped = line.strip()
+        if in_header and stripped and "=" in stripped and not stripped.startswith("#"):
+            key = stripped.split("=", 1)[0].strip()
+            if key in params:
+                out.append("{} = {!r}".format(key, params[key]))
+                continue
+        out.append(line)
+    path.write_text("\n".join(out) + "\n")
 
-# reaction type
-Ea = 209015.7262  # J mol-1
-A = 1.2727e14  # s-1
-R = 8.31446261815324  # JK-1mol-1
-hrp = 1.58e6  # e5 J kg-1
-Y = 0.5534  # char yield [.]
 
-order = 7.3528
+def compile_model():
+    env = dict(os.environ)
+    env["CC"] = "x86_64-conda-linux-gnu-gcc"
+    env["CXX"] = "x86_64-conda-linux-gnu-g++"
+    env["LIBRARY_PATH"] = "/usr/local/cuda/lib64/stubs:" + env.get("LIBRARY_PATH", "")
+    subprocess.run(
+        [
+            "neml2-compile",
+            "--model",
+            "model",
+            "neml2_material.i",
+            "--dtype",
+            "float64",
+            "--device",
+            *DEVICES,
+            "--output-dir",
+            "aoti",
+            "-d",
+            "M1:T",
+            "-d",
+            "M2:T",
+            "-d",
+            "M3:T",
+            "-d",
+            "neml2_pk1:T",
+            "-d",
+            "pk2:deformation_gradient",
+        ],
+        cwd=str(HERE / "neml2"),
+        env=env,
+        check=True,
+    )
 
-#### stress-strain ####
-E = 400e9
 
-# thermal expansion coefficients (degree-1)
-Tref = 300  # K
-g = 4e-6
-
-# convection coefficients - Wm-2K
-htc = 200
-
-# heating profiles for pyrolysis
-T0 = 300  # K - starting and cooling temperatures
-Tmax = 1400  # K
-dTdt = 20  # Kmin-1 heating rate
-t_hold = 0.5  # hrs
-tcool = 0.5  # hrs
-
-# Simulation parameters
-dt = 5
-
-###############################################################################################
-##                                                                                           ##
-##                                       MAIN                                                ##
-##                                                                                           ##
-###############################################################################################
-
-# generate the initial conditions
-intial_condition = generate_initial_conditions(
-    mesh_file,
-    lc,
-    mode=mode,
-    Mref=reference_mass,
-    rho_b=rho_b,
-    rho_p=rho_p,
-    min_binder=min_binder,
-    max_binder=max_binder,
-    beta_a_binder=2.0,
-    beta_b_binder=5.0,
-    seed_binder=4562,
-    mesh_scale=0.01,
-    plot_cond=True,
-)
-
-num_file_data = len(intial_condition["z"])
-
-print("\n")
-
-# run the simulation file PR_pyrolysis.i and initical_condition_from_csv.i
-subprocess.run(
-    [
+def run(num_file_data):
+    args = [
         "mpiexec",
         "-n",
-        str(corenum),
-        puma_run_file,
+        str(CORES),
+        str(PUMA),
         "-i",
         "pyrolysis.i",
         "initial_condition_from_csv.i",
-        "rho_s={:.9f}".format(rho_s),
-        "rho_b={:.9f}".format(rho_b),
-        "rho_g={:.9f}".format(rho_g(1, 1)),
-        "rho_p={:.9f}".format(rho_p),
-        "cp_s={:.9f}".format(cp_s),
-        "cp_b={:.9f}".format(cp_b),
-        "cp_p={:.9f}".format(cp_p),
-        "cp_g={:.9f}".format(cp_p),
-        "k_s={:.9f}".format(k_s),
-        "k_b={:.9f}".format(k_b),
-        "k_p={:.9f}".format(k_p),
-        "k_g={:.9f}".format(k_p),
-        "Ea={:.9f}".format(Ea),
-        "A={:.9f}".format(A),
-        "R={:.9f}".format(R),
-        "hrp={:.9f}".format(hrp),
-        "Y={:.9f}".format(Y),
-        "order={:.9f}".format(order),
-        "E={:.9f}".format(E),
-        "g={:.9f}".format(g),
-        "Tref={:.9f}".format(Tref),
-        "htc={:.9f}".format(htc),
-        "dTdt={:.9f}".format(dTdt),
-        "Tmax={:.9f}".format(Tmax),
-        "t_hold={:.9f}".format(t_hold),
-        "tcool={:.9f}".format(tcool),
-        "T0={:.9f}".format(T0),
-        "dTdt={:.9f}".format(dTdt),
-        "pyro_mu={:.9f}".format(cp_to_wg_relation(1)),
-        "zeta={:.9f}".format(op_to_binder_relation(1)),
-        "num_el={:.9f}".format(num_el),
-        "L={:.9f}".format(L),
-        "Mref={:.9f}".format(reference_mass),
-        "num_file_data={}".format(num_file_data),
-        # "--parse-neml2-only",
-    ],
-    stdin=subprocess.DEVNULL,
-    stdout=open("pyrolysis.log", "w"),
-    stderr=subprocess.STDOUT,
-    text=True,
-)
+    ]
+    args += ["{}={}".format(k, v) for k, v in MOOSE.items()]
+    args += ["num_file_data={}".format(num_file_data)]
+    subprocess.run(args, cwd=str(HERE), check=True)
+
+
+if __name__ == "__main__":
+    ic = generate_initial_conditions(
+        MESH_FILE,
+        LC,
+        mode="mass_fraction",
+        Mref=MATERIAL["Mref"],
+        rho_b=MATERIAL["rho_b"],
+        rho_p=MATERIAL["rho_p"],
+        min_binder=MIN_BINDER,
+        max_binder=MAX_BINDER,
+        beta_a_binder=2.0,
+        beta_b_binder=5.0,
+        seed_binder=4562,
+        mesh_scale=0.01,
+        plot_cond=True,
+    )
+    write_neml2_header(NEML2_MODEL, neml2_constants(MATERIAL))
+    if RECOMPILE or not AOTI_STUB.exists():
+        compile_model()
+    run(len(ic["z"]))

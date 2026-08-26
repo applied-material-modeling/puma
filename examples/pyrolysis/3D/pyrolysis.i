@@ -69,7 +69,7 @@ total_time = '${fparse theat + tcool*3600}'
     [offDiagStressDiv_z]
         type = MomentumBalanceCoupledJacobian
         component = 2
-        variable = disp_y
+        variable = disp_z
         material_temperature_derivative = dpk1dT
     []
 []
@@ -92,51 +92,13 @@ total_time = '${fparse theat + tcool*3600}'
 []
 
 [NEML2]
-    input = 'neml2/neml2_material.i'
-    cli_args = 'rho_s=${rho_s} rho_b=${rho_b} rho_g=${rho_g} rho_p=${rho_p} Mref=${Mref}
-                rho_sm1M=${fparse Mref/rho_s} rho_bm1M=${fparse Mref/rho_b}
-                rho_gm1M=${fparse Mref/rho_g} rho_pm1M=${fparse Mref/rho_p}
-                cp_s=${cp_s} cp_b=${cp_b} cp_g=${cp_g} cp_p=${cp_p}
-                k_s=${k_s} k_b=${k_b} k_g=${k_g} k_p=${k_p}
-                Ea=${Ea} A=${A} R=${R} mY=${fparse -Y}
-                order=${order} source_coeff=${fparse -rho_s*hrp}
-                mu=${pyro_mu} mzeta=${fparse -zeta}
-                E=${E} g=${g} E=${E} Tref=${Tref}'
+    input = 'neml2/aoti/model_aoti.i'
     [all]
         model = 'model'
-        verbose = true
         device = 'cpu'
 
-        moose_input_types = 'VARIABLE     POSTPROCESSOR POSTPROCESSOR   MATERIAL        MATERIAL
-                             MATERIAL     MATERIAL      MATERIAL        MATERIAL        MATERIAL'
-        moose_inputs = '     T            time          time            alpha           alpha
-                             wb           ws            wgcp            phiop           deformation_gradient'
-        neml2_inputs = '     forces/T     forces/t      old_forces/t    old_state/alpha state/alpha
-                             old_state/wb old_state/ws  old_state/wgcp  old_state/phiop forces/F'
-
-        moose_parameter_types = 'MATERIAL        MATERIAL        MATERIAL'
-        moose_parameters = '     wp              mwb0            o_Vref'
-        neml2_parameters = '     wp_state_param  binder_rate_c_0 Jvolume_c_0'
-
-        moose_output_types = 'MATERIAL        MATERIAL   MATERIAL   MATERIAL     MATERIAL
-                              MATERIAL        MATERIAL   MATERIAL   MATERIAL     MATERIAL
-                              MATERIAL        MATERIAL   MATERIAL   MATERIAL     MATERIAL
-                              MATERIAL'
-        moose_outputs = '     phiop           wb         ws         wgcp         pk1_stress
-                              phib            phip       phis       phigcp       alpha
-                              M3              M2         M1         Jt           Jv
-                              V'
-        neml2_outputs = '     state/phiop     state/wb   state/ws   state/wgcp   state/pk1
-                              state/phib      state/phip state/phis state/phigcp state/alpha
-                              state/M3        state/M2   state/M1   state/Jt     state/Jv
-                              state/V'
-
-        moose_derivative_types = 'MATERIAL            MATERIAL              MATERIAL
-                                  MATERIAL            MATERIAL'
-        moose_derivatives = '     dM3dT               dM1dT                 dM2dT
-                                  dpk1dT              pk1_jacobian'
-        neml2_derivatives = '     state/M3 forces/T;  state/M1 forces/T;    state/M2 forces/T;
-                                  state/pk1 forces/T; state/pk1 forces/F'
+        derivatives = 'M3 T dM3dT; M1 T dM1dT; M2 T dM2dT;
+                       neml2_pk1 T dpk1dT; pk2 deformation_gradient dpk2_dF'
 
         initialize_outputs = '      wb  wgcp  ws  alpha  phiop'
         initialize_output_values = 'wb0 wgcp0 ws0 alpha0 phiop0'
@@ -153,6 +115,12 @@ total_time = '${fparse theat + tcool*3600}'
         type = GenericConstantRankTwoTensor
         tensor_name = 'zeroR2'
         tensor_values = '0 0 0 0 0 0 0 0 0'
+    []
+    [stress]
+        type = ComputeLagrangianStressCustomPK2
+        custom_pk2_stress = 'pk2'
+        custom_pk2_jacobian = 'dpk2_dF'
+        large_kinematics = true
     []
     [convection]
         type = ADParsedMaterial
@@ -237,30 +205,12 @@ total_time = '${fparse theat + tcool*3600}'
             execute_on = 'INITIAL TIMESTEP_END'
         []
     []
-    [wp]
-        order = CONSTANT
-        family = MONOMIAL
-        [AuxKernel]
-            type = MaterialRealAux
-            property = wp
-            execute_on = 'INITIAL TIMESTEP_END'
-        []
-    []
     [wgcp]
         order = CONSTANT
         family = MONOMIAL
         [AuxKernel]
             type = MaterialRealAux
             property = wgcp
-            execute_on = 'INITIAL TIMESTEP_END'
-        []
-    []
-    [o_Vref]
-        order = CONSTANT
-        family = MONOMIAL
-        [AuxKernel]
-            type = MaterialRealAux
-            property = o_Vref
             execute_on = 'INITIAL TIMESTEP_END'
         []
     []

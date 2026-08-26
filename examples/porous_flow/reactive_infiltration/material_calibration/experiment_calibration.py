@@ -1,373 +1,277 @@
-import torch
-import torch.distributions as dist
-import neml2
-from pyzag import nonlinear, reparametrization, chunktime
-import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
-from matplotlib.ticker import AutoMinorLocator
-import pandas as pd
-import tqdm
+# Copyright 2025, UChicago Argonne, LLC
+# All Rights Reserved
+# Software Name: PUMA: Powder Utilization Modeling Application
+# By: UChicago Argonne, LLC
+# OPEN SOURCE LICENSE (MIT)
+
+import importlib.util
 import os
+import shutil
+import sys
+from pathlib import Path
 
+# TorchInductor (compile=True) needs a plain C++ compiler. Prefer conda's g++
+# (the moose-src env), else fall back to the system g++ (the nemlv3_pyzag env).
+# This overrides any mpicxx/mpicc leaked in by an activated build sourcefile,
+# which breaks Inductor's PCH step.
+_cxx = shutil.which("x86_64-conda-linux-gnu-g++") or shutil.which("g++")
+_cc = shutil.which("x86_64-conda-linux-gnu-gcc") or shutil.which("gcc")
+if _cxx:
+    os.environ["CXX"] = _cxx
+if _cc:
+    os.environ["CC"] = _cc
 
-## Set up plot ------------------------------------------------------------
-fe = fm.FontEntry(
-    fname="/home/tranh/Fonts/arial.ttf", name="Arial"
+import neml2
+import pandas as pd
+import torch
+import tqdm
+from matplotlib import pyplot as plt
+from neml2.pyzag import NEML2PyzagModel
+from pyzag import chunktime, nonlinear, reparametrization
+
+_pkg = Path(__file__).resolve().parents[4] / "neml2_models" / "python"
+_spec = importlib.util.spec_from_file_location(
+    "puma_neml2_models", _pkg / "__init__.py", submodule_search_locations=[str(_pkg)]
 )
-fm.fontManager.ttflist.insert(0, fe)
+_mod = importlib.util.module_from_spec(_spec)
+sys.modules["puma_neml2_models"] = _mod
+_spec.loader.exec_module(_mod)
 
-font = {"family": "Arial"}
-fsize = 11
-lw = 1.2
+torch.manual_seed(0)
+torch.set_default_dtype(torch.double)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-plt.rc("font", **font)
-plt.rc("font", **font, size=fsize)  # controls default text sizes
-plt.rc("axes", titlesize=fsize)  # fontsize of the axes title
-plt.rc("axes", labelsize=fsize)  # fontsize clearof the x and y labels
-plt.rc("xtick", labelsize=fsize)  # fontsize of the tick labels
-plt.rc("ytick", labelsize=fsize)  # fontsize of the tick labels
-plt.rc("legend", fontsize=fsize)  # legend fontsize
-plt.rc("figure", titlesize=fsize)  # fontsize of the figure title
+tmax = 400.0
+dt = 1.0
+nt = int(tmax * 60.0 / dt)
+delta_P0 = 1.0e-4
 
-colors = ["blue", "red", "black", "purple"]  # Extend as needed
-linestyles = ["-", "--", "-.", ":", (0, (3, 1, 1, 1))]  # Custom dash patterns optional
-marker = ['o','s','^','p','*','d','v','h','x','+']  # Extend as needed
-facecond = ['none', 'none', 'k', 'none', 'none', 'none', 'none', 'none', 'none', 'none']  # Extend as needed
-
-## Input ------------------------------------------------------------
-experiment_name = "SiC_growth_full.csv"
+exp_folder = "experiment_data"
+exp_filename = "SiC_growth_full.csv"
+fit_group = "Martinez"
 
 save_folder = "results_2"
-torch.manual_seed(0)
-nchunk = 100
+nchunk = 250
+niter = 1000
+lr = 1.0e-2
+# early stop: quit if the loss hasn't improved by >plateau_tol (relative) for
+# plateau_patience consecutive iterations (protects against wasting the tail).
+plateau_patience = 120
+plateau_tol = 1.0e-3
 
-torch.set_default_dtype(torch.double)
-if torch.cuda.is_available():
-    dev = "cuda:0"
-else:
-    dev = "cpu"
-device = torch.device(dev)
+CALIBRATION_PARAMS = ["crit_delta_value", "nucleation_rate_K", "diffusion_rate_K"]
+# Deliberately poor starting guess: both reaction-rate constants are set to 0.3x
+# their calibrated values (MSE ~9.9 vs ~0.29 at the optimum) so the optimization
+# has a clear descent to show. The calibrated values are ~1.1853e-12 / ~0.0095.
+INITIAL = {
+    "crit_delta_value": 7.5989,
+    "nucleation_rate_K": 3.5559e-13,
+    "diffusion_rate_K": 2.85e-3,
+}
+PARAM_RANGES = {
+    "crit_delta_value": (0.0, 1.0),
+    "nucleation_rate_K": (1.0e-13, 1.0e-12),
+    "diffusion_rate_K": (1.0e-3, 1.0e-2),
+}
+colors = ["blue", "red", "black", "purple"]
+markers = ["o", "s", "^", "p", "*", "d", "v", "h", "x", "+"]
 
-## simulation condition
-tmax = 400 # minutes
-dt = 1 # seconds
+fsize = 11
+plt.rc("font", size=fsize)
+plt.rc("axes", titlesize=fsize)
+plt.rc("axes", labelsize=fsize)
 
-## initial guess
-hc = 7.5989 # micro-meter
-Q = 1.0 # fraction transform -- 1 - exp(-K*tc) where tc is the closure time
-K_nucl = 1.1853e-12 # kinetic constant for nucleation
-K_diff = 0.0095 # kinetic constant for diffusion
 
-# Optimization
-niter = 100
-lr = 1.0e-3
-check_grad_norm = False
-
-## NEML2 - PyTORCH wrapper
 class SiCGrowth(torch.nn.Module):
-    """Just integrate the model through some strain history
-
-    Args:
-        discrete_equations: the pyzag wrapped model
-        nchunk (int): number of vectorized time steps
-        rtol (float): relative tolerance to use for Newton's method during time integration
-        atol (float): absolute tolerance to use for Newton's method during time integration
-    """
-
-    def __init__(self, discrete_equations, nchunk=1, rtol=1.0e-8, atol=1.0e-8):
+    def __init__(self, factory, ntime, forces, y0, nchunk=1, rtol=1.0e-8, atol=1.0e-8):
         super().__init__()
-        self.discrete_equations = discrete_equations
+        self.factory = factory
+        self.ntime = ntime
+        self.forces = forces
+        self.y0 = y0
         self.nchunk = nchunk
-        self.cached_solution = None
         self.rtol = rtol
         self.atol = atol
+        self.cached_solution = None
 
-    def forward(self, time, cache=False):
-        """Integrate through some time and return
-        Args:
-            time (torch.tensor): batched times
-
-        Keyword Args:
-            cache (bool): if true, cache the solution and use it as a predictor for the next call.
-                This heuristic can speed things up during inference where the model is called repeatedly with similar parameter values.
-        """
+    def forward(self, cache=False):
         if cache and self.cached_solution is not None:
-            solver = nonlinear.RecursiveNonlinearEquationSolver(
-                self.discrete_equations,
-                step_generator=nonlinear.StepGenerator(self.nchunk),
-                predictor=nonlinear.FullTrajectoryPredictor(self.cached_solution),
-                nonlinear_solver=chunktime.ChunkNewtonRaphson(
-                    rtol=self.rtol, atol=self.atol
-                ),
-            )
+            predictor = nonlinear.FullTrajectoryPredictor(self.cached_solution)
         else:
-            solver = nonlinear.RecursiveNonlinearEquationSolver(
-                self.discrete_equations,
-                step_generator=nonlinear.StepGenerator(self.nchunk),
-                predictor=nonlinear.PreviousStepsPredictor(),
-                nonlinear_solver=chunktime.ChunkNewtonRaphson(
-                    rtol=self.rtol, atol=self.atol
-                ),
-            )
-
-        # Setup
-        forces = self.discrete_equations.forces_asm.assemble_by_variable(
-            {
-                "forces/t": time,
-            }
-        ).torch()
-
-        state0 = torch.zeros(
-            forces.shape[1:-1] + (self.discrete_equations.nstate,), device=forces.device
+            predictor = nonlinear.PreviousStepsPredictor()
+        solver = nonlinear.RecursiveNonlinearEquationSolver(
+            self.factory,
+            step_generator=nonlinear.StepGenerator(self.nchunk),
+            predictor=predictor,
+            nonlinear_solver=chunktime.ChunkNewtonRaphson(rtol=self.rtol, atol=self.atol),
         )
-
-        state0[..., -1] = 1e-4
-
-        result = nonlinear.solve_adjoint(solver, state0, len(forces), forces)
-
+        result = nonlinear.solve_adjoint(solver, self.y0, self.ntime, self.forces)
         if cache:
             self.cached_solution = result.detach().clone()
+        return result[..., 0, 0]
 
-        return result[..., 0]
 
-def save_csv(time, thickness, folder, name):
-    # assuming two columns: first column is time, second column is thickness
-    df = pd.DataFrame({
-        "time (s)": time,
-        "thickness (microm)": thickness
-    })
-    df.to_csv(os.path.join(folder, name), index=False)
+def linear_interp_1d(x, y, xnew):
+    x = x.flatten().contiguous()
+    y = y.flatten().contiguous()
+    xnew = xnew.flatten().contiguous()
+    idx = torch.searchsorted(x, xnew, right=True) - 1
+    idx = idx.clamp(0, len(x) - 2)
+    x0, x1, y0, y1 = x[idx], x[idx + 1], y[idx], y[idx + 1]
+    return y0 + (y1 - y0) * (xnew - x0) / (x1 - x0)
 
-def plot_prediction_experiment(model, time, ax, 
-                               plot_experiment=True,
-                               experiment_name="SiC_growth.csv",
-                               save_data=True, 
-                               save_folder="results",
-                               save_name="data.csv"):
 
-    with torch.no_grad():
-        out = model(time, cache=True)
-
-    if save_data:
-        if not os.path.exists(save_folder):
-            os.makedirs(save_folder)
-        save_csv((time[:,0]/60).cpu().reshape(-1), out[:,0].cpu().reshape(-1), save_folder, save_name
+def load_experiment():
+    df = pd.read_csv("{}/{}".format(exp_folder, exp_filename))
+    groups = []
+    for name, subset in df.groupby("Literature"):
+        groups.append(
+            {
+                "id": name,
+                "time": torch.tensor(subset["Reaction Duration (min)"].values, device=device),
+                "thickness": torch.tensor(subset["SiC thickness (mu-m)"].values, device=device),
+            }
         )
+    return groups
 
-    ax.plot(
-        (time[:,0]/60).cpu(),
-        out[:,0].cpu(),
-        color="red",
-        linestyle="-",
-        linewidth=lw,
-        label="NEML2",
-    )
 
-    # experiment data
-    # Load CSV
-    df = pd.read_csv(experiment_name)
-    experiment = []
-    
-    # Scatter plot
-    for i, (literature, subset) in enumerate(df.groupby("Literature")):
-        if plot_experiment:
-            ax.scatter(
-                subset["Reaction Duration (min)"],
-                subset["SiC thickness (mu-m)"],
-                label=literature,
-                marker=marker[i],
-                facecolors=facecond[i],          
-                edgecolors='k'          
-            )
-        # set experiment as "id", "time", "values" each literature data as id, time, thickness
-        experiment.append({
-            "id": literature,
-            "time": torch.tensor(subset["Reaction Duration (min)"].values, device=device),
-            "thickness": torch.tensor(subset["SiC thickness (mu-m)"].values, device=device)
-        })
-
+def plot_prediction(model, pred_time, groups, ax):
+    with torch.no_grad():
+        thickness = model().cpu()
+    ax.plot(pred_time.cpu(), thickness, color="red", label="NEML2")
+    for i, g in enumerate(groups):
+        ax.scatter(g["time"].cpu(), g["thickness"].cpu(), marker=markers[i % len(markers)],
+                   facecolors="none", edgecolors="k", label=g["id"])
     ax.set_xlabel("Reaction Duration (minutes)")
     ax.set_ylabel("SiC Thickness (micrometers)")
-    # ax.legend(frameon=False, bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax.legend(loc="best", frameon=False)
 
-    return experiment
 
-def evaluate_loss(model, time, experiments, loss_fn, experiment_ids="all"):
-
-    pred_time = (time[:,0] / 60)                 # minutes
-    pred_values = model(time, cache=True)[:,0]   # (nt,)
-
-    if experiment_ids != "all":
-        if isinstance(experiment_ids, str):
-            experiment_ids = [experiment_ids]
-        experiments = [exp for exp in experiments if exp["id"] in experiment_ids]
-
+def evaluate_loss(model, pred_time, groups, loss_fn):
+    pred = model(cache=True)
     losses = []
-    for exp in experiments:
-        exp_time = exp["time"]
-        exp_values = exp["thickness"]
-
-        # interpolation prediction to experimental time
-        pred_interp = torch_interp(exp_time, pred_time, pred_values)
-        losses.append(loss_fn(pred_interp, exp_values))
-
+    for g in groups:
+        if g["id"] != fit_group:
+            continue
+        pred_interp = linear_interp_1d(pred_time, pred, g["time"])
+        losses.append(loss_fn(pred_interp, g["thickness"]))
     return torch.stack(losses).mean()
 
-def torch_interp(x, xp, fp):
 
-    xp = xp.squeeze()
-    fp = fp.squeeze()
+def main():
+    time = torch.linspace(0.0, tmax * 60.0, nt, device=device).reshape(nt, 1)
+    pred_time = time[:, 0] / 60.0
 
-    idx = torch.searchsorted(xp, x, right=True) - 1
-    idx = idx.clamp(0, len(xp) - 2)  # keep within bounds
+    nsys = neml2.load_nonlinear_system("SiCgrowth.i", "eq_sys")
+    factory = NEML2PyzagModel(nsys, include_parameters=CALIBRATION_PARAMS)
+    neml2.compile(factory)
+    factory.to(device=device)
+    with torch.no_grad():
+        for name, value in INITIAL.items():
+            getattr(factory, name).fill_(value)
 
-    x0, x1 = xp[idx], xp[idx+1]
-    y0, y1 = fp[idx], fp[idx+1]
+    y0 = factory.assemble_state({"delta_P": torch.full((1,), delta_P0, device=device)}, dynamic_dim=1)
+    forces = factory.assemble_forces({"t": time}, dynamic_dim=2)
 
-    slope = (y1 - y0) / (x1 - x0)
-    return y0 + slope * (x - x0)
+    model = SiCGrowth(factory, nt, forces, y0, nchunk=nchunk)
+    groups = load_experiment()
 
-## Main -------------------------------------------------------------
+    fig1, ax1 = plt.subplots(figsize=(6, 4))
+    plot_prediction(model, pred_time, groups, ax1)
 
-# create save folder if it does not exist
-if not os.path.exists(save_folder):
-    os.makedirs(save_folder)
+    # persist the initial-guess prediction curve (params still at INITIAL) so the
+    # paper figure can show the "before calibration" line.
+    if not os.path.exists(save_folder):
+        os.makedirs(save_folder)
+    with torch.no_grad():
+        init_thickness = model().cpu().numpy()
+    pd.DataFrame(
+        {"time_min": pred_time.cpu().numpy(), "thickness_um": init_thickness}
+    ).to_csv("{}/initial_curve.csv".format(save_folder), index=False)
 
-# neml2 model
-nmodel = neml2.load_model("SiCgrowth.i", "model")
-nmodel.to(device=device)
+    map_dict = {
+        "factory.{}".format(name): reparametrization.RangeRescale(
+            torch.tensor(lo, device=device), torch.tensor(hi, device=device), clamp=False
+        )
+        for name, (lo, hi) in PARAM_RANGES.items()
+    }
+    reparametrization.Reparameterizer(map_dict, error_not_provided=True)(model)
 
-print(nmodel)
+    if not os.path.exists(save_folder):
+        os.makedirs(save_folder)
 
-# initial guess
-nmodel.crit_delta_value = neml2.tensors.Scalar.full(hc)
-nmodel.nucleation_rate_Q = neml2.tensors.Scalar.full(Q)
-nmodel.nucleation_rate_K = neml2.tensors.Scalar.full(K_nucl)
-nmodel.diffusion_rate_K = neml2.tensors.Scalar.full(K_diff)
+    # Checkpoint helpers -- write incrementally during the loop so all data
+    # needed to replot survives an early kill (e.g. once the loss plateaus).
+    def save_loss(hist):
+        pd.DataFrame(
+            {"iteration": range(1, len(hist) + 1), "mse": hist}
+        ).to_csv("{}/loss_history.csv".format(save_folder), index=False)
 
-model = SiCGrowth(
-    neml2.pyzag.NEML2PyzagModel(
-        nmodel,
-        exclude_parameters=["diffusion_rate_switch_A", 
-                            "nucleation_rate_switch_A",
-                            "nucleation_rate_Q",
-                            "o_dP_A"]  # exclude parameters from optimization,
-    ),
-    nchunk=nchunk,
-)
+    def save_fit():
+        with torch.no_grad():
+            thickness = model().cpu().numpy()
+        pd.DataFrame(
+            {"time_min": pred_time.cpu().numpy(), "thickness_um": thickness}
+        ).to_csv("{}/fit_curve.csv".format(save_folder), index=False)
 
-nt = int(tmax*60/dt)
+    def current_params():
+        # getattr(factory, name) returns the physical (de-reparametrized) value
+        with torch.no_grad():
+            return {n: float(getattr(factory, n).detach().cpu()) for n in CALIBRATION_PARAMS}
 
-# Create time sequence: shape (steps, batch, features)
-time = torch.linspace(0, tmax*60, nt, device=device)        # (nt,)
-time = time[:, None, None]                                  # (nt, 1, 1)                                     
+    def save_params(it):
+        vals = current_params()
+        pd.DataFrame([{"iteration": it, **vals}]).to_csv(
+            "{}/calibrated_params.csv".format(save_folder), index=False
+        )
 
-fig1, ax1 = plt.subplots(figsize=(4,2.9))
-ax1.minorticks_on()
-ax1.set_xlim(0, 400)
-ax1.set_ylim(0, 25)
-ax1.xaxis.set_minor_locator(AutoMinorLocator(2))
-ax1.yaxis.set_minor_locator(AutoMinorLocator(2))
-experiments = plot_prediction_experiment(model, time, ax1, plot_experiment=True,
-                                         experiment_name=experiment_name,
-                                         save_data=False, save_folder="check_order", 
-                                         save_name="first.csv")
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    loss_fn = torch.nn.MSELoss()
+    loss_history = []
+    best_loss = float("inf")
+    best_iter = 0
+    titer = tqdm.tqdm(range(niter))
+    for i in titer:
+        optimizer.zero_grad()
+        loss = evaluate_loss(model, pred_time, groups, loss_fn)
+        loss.backward()
+        loss_history.append(float(loss.detach().cpu()))
+        titer.set_description("Loss: %3.2e" % loss_history[-1])
+        optimizer.step()
+        # checkpoint (loss is cheap; fit needs a forward, so save it less often)
+        if (i + 1) % 10 == 0:
+            save_loss(loss_history)
+        if (i + 1) % 50 == 0:
+            save_fit()
+        if (i + 1) % 10 == 0:
+            save_params(i + 1)
+        # early stop on plateau
+        if loss_history[-1] < best_loss * (1.0 - plateau_tol):
+            best_loss = loss_history[-1]
+            best_iter = i
+        if i - best_iter >= plateau_patience:
+            print("\nplateau: no >%.1f%% improvement in %d iters; stopping at iter %d"
+                  % (plateau_tol * 100, plateau_patience, i + 1))
+            break
 
-fig1.tight_layout()
-fig1.savefig(f"{save_folder}/initial_guess.png", dpi=300)
-plt.close()
+    save_loss(loss_history)
+    save_fit()
+    save_params(len(loss_history))
+    print("\ncalibrated parameters (final MSE %.4e):" % loss_history[-1])
+    for name, value in current_params().items():
+        print("  %-20s = %.6g" % (name, value))
 
-## Rescaling
-hc_scaler = reparametrization.RangeRescale(
-    torch.tensor(0.0, device=device), torch.tensor(1.0, device=device), clamp=False
-)
-Q_scaler = reparametrization.RangeRescale(
-    torch.tensor(0.0, device=device), torch.tensor(1.0, device=device), clamp=False
-)
-K_nucl_scaler = reparametrization.RangeRescale(
-    torch.tensor(1.0e-13, device=device), torch.tensor(1.0e-12, device=device), clamp=False
-)
-K_diff_scaler = reparametrization.RangeRescale(
-    torch.tensor(1.0e-3, device=device), torch.tensor(1.0e-2, device=device), clamp=False
-)
+    fig2, ax2 = plt.subplots(1, 2, figsize=(11, 4))
+    ax2[0].loglog(loss_history)
+    ax2[0].set_xlabel("Iteration")
+    ax2[0].set_ylabel("MSE")
+    plot_prediction(model, pred_time, groups, ax2[1])
 
-model_reparameterizer = reparametrization.Reparameterizer(
-    {
-        "discrete_equations.crit_delta_value": hc_scaler,
-        # "discrete_equations.nucleation_rate_Q": Q_scaler,
-        "discrete_equations.nucleation_rate_K": K_nucl_scaler,
-        "discrete_equations.diffusion_rate_K": K_diff_scaler,
-    },
-    error_not_provided=True,
-)
-model_reparameterizer(model)
-
-## Optimizing
-optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-loss_fn = torch.nn.MSELoss()
-
-titer = tqdm.tqdm(
-    range(niter),
-    bar_format="{desc}: {percentage:3.0f}%|{bar}|{n_fmt}/{total_fmt}{postfix}",
-)
-titer.set_description("Loss:")
-loss_history = []
-
-print("Initial Guess:")
-for n, p in model.discrete_equations.named_parameters():
-    nice_name = n.split(".")[-2]
-    ref_name = "discrete_equations." + nice_name
-    scaler = model_reparameterizer.map_dict[ref_name]
-    print(nice_name + ": \t" + str(scaler(p.data).cpu()) + "\t")
-
-for i in titer:
-    optimizer.zero_grad()
-    loss = evaluate_loss(model, time, experiments, loss_fn, experiment_ids="Martinez")#"all")
-    loss.backward()
-    optimizer.step()
-
-    loss_history.append(loss.detach().clone().cpu())
-    titer.set_description("Loss: %3.2e" % loss_history[-1])
-    optimizer.step()
-
-    if check_grad_norm:
-        print("Checking gradient norms after first iteration, optimization will only run for 1 iteration:")
-        for name, param in model.named_parameters():
-            if param.grad is not None:
-                print(f"{name}: grad norm = {param.grad.norm():.3e}")
-            else:
-                print(f"{name}: grad is None")
-        break
-
-if not check_grad_norm:
-    # Print final results
-    print("Optimized results:")
-    for n, p in model.discrete_equations.named_parameters():
-        nice_name = n.split(".")[-2]
-        ref_name = "discrete_equations." + nice_name
-        scaler = model_reparameterizer.map_dict[ref_name]
-        print(nice_name + ": \t" + str(scaler(p.data).cpu()) + "\t")
-
-    fig2, ax2 = plt.subplots(figsize=(6,4))
-    experiments = plot_prediction_experiment(model, time, ax2, plot_experiment=True,
-                                             experiment_name=experiment_name,
-                                             save_data=True, save_folder=save_folder, 
-                                             save_name="fitted.csv")
+    fig1.tight_layout()
     fig2.tight_layout()
-    fig2.savefig(f"{save_folder}/optimized_results.png", dpi=300)
+    fig1.savefig("{}/initial_guess.png".format(save_folder), dpi=300)
+    fig2.savefig("{}/optimized_results.png".format(save_folder), dpi=300)
 
-    plt.close(fig2)
 
-# Plot the loss history final results preidctions
-figsize = (8, 4)
-fig3, ax3 = plt.subplots(figsize=(6,4))
-
-ax3.loglog(loss_history)
-ax3.set_xlabel("Iteration")
-ax3.set_ylabel("MSE")
-
-fig3.tight_layout()
-fig3.savefig(f"{save_folder}/loss_history.png", dpi=300)
-
-plt.close(fig3)
-
+if __name__ == "__main__":
+    main()

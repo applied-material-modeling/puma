@@ -1,15 +1,11 @@
-[Settings]
-  additional_libraries = 'libpuma_matlib.so'
-[]
-
 [Tensors]
     [F]
-        type = FillR2
-        values = '2.0 1.0 0.0 0.0 3.0 1.0 0.0 0.0 4.0'
+        type = Python
+        expr = "R2(torch.tensor([[2.0, 1.0, 0.0], [0.0, 3.0, 1.0], [0.0, 0.0, 4.0]], dtype=torch.float64))"
     []
     [Spc]
-        type = FillR2
-        values = '-33.5416666666667 7.0833333333333 -1.25 7.0833333333333 -14.1666666666667 2.5 -1.25 2.5 -7.5'
+        type = Python
+        expr = "R2(torch.tensor([[-33.5416666666667, 7.0833333333333, -1.25], [7.0833333333333, -14.1666666666667, 2.5], [-1.25, 2.5, -7.5]], dtype=torch.float64))"
     []
 []
 

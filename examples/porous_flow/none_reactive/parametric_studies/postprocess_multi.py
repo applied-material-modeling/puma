@@ -11,18 +11,12 @@ plt_dir.mkdir(exist_ok=True)
 
 step = 5
 
-fe = fm.FontEntry(
-    fname="/home/tranh/Fonts/arial.ttf", name="Arial"
-)
-fm.fontManager.ttflist.insert(0, fe)
 
-font = {"family": "Arial"}
 fsize = 11
 lw = 1
 figsize = (5.22, 3.4)
 
-plt.rc("font", **font)
-plt.rc("font", **font, size=fsize)  # controls default text sizes
+plt.rc("font", size=fsize)  # controls default text sizes
 plt.rc("axes", titlesize=fsize)  # fontsize of the axes title
 plt.rc("axes", labelsize=fsize)  # fontsize clearof the x and y labels
 plt.rc("xtick", labelsize=fsize)  # fontsize of the tick labels

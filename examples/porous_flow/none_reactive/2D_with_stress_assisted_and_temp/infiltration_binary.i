@@ -14,20 +14,13 @@ dTdt = 1 # deg per s
 # denisty # g cm-3
 rho_PR = 2.00 # density at liquid state
 
-brooks_corey_threshold = 1e4 #Pa
-capillary_pressure_power = 3
-phi_L_residual = 0.0
 
-permeability_power = 3
 
 # liquid viscosity
-mu_PR = 10
 
 # solid permeability
-kk_PR = 2e-5
 
 # heat enthalpy [g-cm2/s2]
-hf = 1e7
 
 # thermal conductivity
 kappa_PR = 2e3 #[gcm/s3/K]
@@ -44,15 +37,9 @@ htc = 2e1 #g / s3-K
 porosity_feature = 0.5
 porosity_background = 0.5
 
-E = 1000
-nu = 0.3
-therm_expansion = 1e-4
 T0 = 300
 
-E_feature = '${fparse E*porosity_feature}'
-E_background = '${fparse E*porosity_background}'
 
-advs_coefficient = 10.0
 
 gravity = 0 #980.665
 
@@ -279,41 +266,16 @@ displace_value_y = 1
 []
 
 [NEML2]
-  input = 'neml2/neml2_material.i'
-  cli_args = 'kk_L=${kk_PR} permeability_power=${permeability_power} rhof_nu=${fparse rho_PR/mu_PR}
-              rhof2_nu=${fparse rho_PR^2/mu_PR} phif_residual=${phi_L_residual} rho_f=${fparse rho_PR}
-              brooks_corey_threshold=${brooks_corey_threshold} capillary_pressure_power=${capillary_pressure_power}
-              nu=${nu} advs_coefficient=${advs_coefficient} hf_rhof_nu=${fparse hf*rho_PR/mu_PR}
-              hf_rhof2_nu=${fparse hf*rho_PR^2/mu_PR} therm_expansion=${therm_expansion} Tref=${T0}'
+  input = 'neml2/aoti/model_aoti.i'
   [all]
     model = 'model'
-    verbose = true
     device = 'cpu'
 
-    moose_input_types = 'VARIABLE    VARIABLE MATERIAL'
-    moose_inputs = '     phif        T        deformation_gradient'
-    neml2_inputs = '     forces/phif forces/T forces/F'
-
-    moose_parameter_types = 'MATERIAL       MATERIAL'
-    moose_parameters = '     void           E       '
-    neml2_parameters = '     phif_max_param S_pk2_E '
-
-    moose_output_types = 'MATERIAL   MATERIAL MATERIAL MATERIAL MATERIAL
-                          MATERIAL MATERIAL MATERIAL   MATERIAL    MATERIAL'
-    moose_outputs = '     pk1_stress M1       M3       M4       M5
-                          M8       M9       poro       phis        perm'
-    neml2_outputs = '     state/pk1  state/M1 state/M3 state/M4 state/M5
-                          state/M8 state/M9 state/poro state/solid state/perm'
-
-    moose_derivative_types = 'MATERIAL               MATERIAL             MATERIAL
-                              MATERIAL               MATERIAL             MATERIAL
-                              MATERIAL               MATERIAL'
-    moose_derivatives = '     dM5dphif               dM1dF                pk1_jacobian
-                              dpk1dphif              dM5dF                dpk1dT
-                              dM4dphif               dM9dphif'
-    neml2_derivatives = '     state/M5  forces/phif; state/M1 forces/F;   state/pk1 forces/F;
-                              state/pk1 forces/phif; state/M5 forces/F;   state/pk1 forces/T;
-                              state/M4  forces/phif; state/M9 forces/phif'
+    derivatives = 'M5 phif dM5dphif; M1 deformation_gradient dM1dF;
+                   pk2 deformation_gradient dpk2_dF; neml2_pk1 phif dpk1dphif;
+                   M5 deformation_gradient dM5dF; neml2_pk1 T dpk1dT;
+                   M4 phif dM4dphif; M9 phif dM9dphif;
+                   M3 phif dM3dphif; M8 phif dM8dphif'
   []
 []
 
@@ -325,31 +287,37 @@ displace_value_y = 1
   []
   [constant_derivative]
     type = GenericConstantMaterial
-    prop_names = ' dM1dP    dM1dphif dM1dT dM2dphif dM2dP dM2dT
-                   dM3dphif dM3dP    dM3dT dM4dP    dM4dT dM5dP dM5dT
-                   dM6dP    dM6dphif dM6dT dM7dphif dM7dP dM7dT
-                   dM8dphif dM8dP    dM8dT dM9dP    dM9dT'
-    prop_values = '0.0      0.0      0.0   0.0      0.0   0.0
-                   0.0      0.0      0.0   0.0      0.0   0.0   0.0
-                   0.0      0.0      0.0   0.0      0.0   0.0
-                   0.0      0.0      0.0   0.0      0.0'
+    prop_names = ' dM1dP dM1dphif dM1dT dM2dphif dM2dP dM2dT
+                   dM3dP dM3dT    dM4dP dM4dT    dM5dP dM5dT
+                   dM6dP dM6dphif dM6dT dM7dphif dM7dP dM7dT
+                   dM8dP dM8dT    dM9dP dM9dT'
+    prop_values = '0.0   0.0      0.0   0.0      0.0   0.0
+                   0.0   0.0      0.0   0.0      0.0   0.0
+                   0.0   0.0      0.0   0.0      0.0   0.0
+                   0.0   0.0      0.0   0.0'
   []
   [void_feature]
     type = GenericConstantMaterial
-    prop_names = 'void E'
-    prop_values = '${porosity_feature} ${E_feature}'
+    prop_names = 'void'
+    prop_values = '${porosity_feature}'
     block = circle
   []
   [void_background]
     type = GenericConstantMaterial
-    prop_names = 'void E'
-    prop_values = '${porosity_background} ${E_background}'
+    prop_names = 'void'
+    prop_values = '${porosity_background}'
     block = non_circle
   []
   [zeroR2]
     type = GenericConstantRankTwoTensor
     tensor_name = 'zeroR2'
     tensor_values = '0 0 0 0 0 0 0 0 0'
+  []
+  [stress]
+    type = ComputeLagrangianStressCustomPK2
+    custom_pk2_stress = 'pk2'
+    custom_pk2_jacobian = 'dpk2_dF'
+    large_kinematics = true
   []
   [convection]
     type = ADParsedMaterial
@@ -414,7 +382,7 @@ displace_value_y = 1
     outlet_flux = flux_out
     product_fraction = 0.0
     product_fraction_derivative = 0.0
-    solid_fraction = phis
+    solid_fraction = solid
     solid_fraction_derivative = 0.0
     variable = phif
   []

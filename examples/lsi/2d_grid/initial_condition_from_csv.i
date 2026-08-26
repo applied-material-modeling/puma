@@ -45,6 +45,12 @@
         expression = '(1-phi0_poro)*${fparse 1-C_ratio}'
         coupled_variables = phi0_poro
     []
+    [init_phinoreact]
+        type = ParsedMaterial
+        property_name = phinoreact
+        expression = '(1-phi0_poro)*${fparse 1-C_ratio}'
+        coupled_variables = phi0_poro
+    []
 []
 
 [ICs]

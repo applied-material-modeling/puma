@@ -141,42 +141,15 @@ total_time = '${fparse theat + tcool*3600}'
 []
 
 [NEML2]
-    input = 'neml2/infiltration.i'
-    cli_args = 'kk_L=${kk_b} permeability_power=${permeability_power} rhof_nu=${fparse rho_b/mu_b}
-              rhof2_nu=${fparse rho_b^2/mu_b} phif_residual=${phi_L_residual} rho_f=${fparse rho_b}
-              brooks_corey_threshold=${brooks_corey_threshold} capillary_pressure_power=${capillary_pressure_power}
-              hf_rhof_nu=${fparse hf*rho_b/mu_b} swelling_coefficient=0.0
-              hf_rhof2_nu=${fparse hf*rho_b^2/mu_b} therm_expansion=${g} Tref=${Tref}
-              E=${E}'
+    input = 'neml2/aoti_infiltration/model_aoti.i'
     [all]
         model = 'model'
-        verbose = true
         device = 'cpu'
 
-        moose_input_types = 'VARIABLE    VARIABLE MATERIAL'
-        moose_inputs = '     phif        T        deformation_gradient'
-        neml2_inputs = '     forces/phif forces/T forces/F'
-
-        moose_parameter_types = 'MATERIAL       MATERIAL    MATERIAL'
-        moose_parameters = '     void           o_Vref      V'
-        neml2_parameters = '     phif_max_param Jvolume_c_0 V_param'
-
-        moose_output_types = 'MATERIAL   MATERIAL MATERIAL   MATERIAL    MATERIAL
-                              MATERIAL   MATERIAL MATERIAL   MATERIAL    MATERIAL   MATERIAL'
-        moose_outputs = '     pk1_stress M1       M3         M4          M5
-                              M8         M9       poro       phis        perm       pk2_stress'
-        neml2_outputs = '     state/pk1 state/M1  state/M3   state/M4    state/M5
-                              state/M8  state/M9  state/poro state/solid state/perm state/pk2'
-
-        moose_derivative_types = 'MATERIAL               MATERIAL             MATERIAL
-                                  MATERIAL               MATERIAL
-                                  MATERIAL               MATERIAL'
-        moose_derivatives = '     dM5dphif               dM1dF                pk1_jacobian
-                                  dM5dF                dpk1dT
-                                  dM4dphif               dM9dphif'
-        neml2_derivatives = '     state/M5  forces/phif; state/M1 forces/F;   state/pk1 forces/F;
-                                  state/M5 forces/F;   state/pk1 forces/T;
-                                  state/M4  forces/phif; state/M9 forces/phif'
+        derivatives = 'M5 phif dM5dphif; M1 deformation_gradient dM1dF;
+                       pk2_stress deformation_gradient dpk2_dF;
+                       M5 deformation_gradient dM5dF; neml2_pk1 T dpk1dT;
+                       M4 phif dM4dphif; M9 phif dM9dphif'
     []
 []
 
@@ -201,6 +174,21 @@ total_time = '${fparse theat + tcool*3600}'
         type = GenericConstantRankTwoTensor
         tensor_name = 'zeroR2'
         tensor_values = '0 0 0 0 0 0 0 0 0'
+    []
+    [stress]
+      type = ComputeLagrangianStressCustomPK2
+      custom_pk2_stress = 'pk2_stress'
+      custom_pk2_jacobian = 'dpk2_dF'
+      large_kinematics = true
+    []
+    # phif_max (maximum fluid fraction) is the pyrolysis open porosity carried in
+    # as material 'void' (from initial_condition_from_exodus_3.i). NEML2 gathers it
+    # by name as a bare input.
+    [phif_max_mat]
+        type = ParsedMaterial
+        property_name = phif_max
+        material_property_names = 'void'
+        expression = 'void'
     []
     [convection]
         type = ADParsedMaterial

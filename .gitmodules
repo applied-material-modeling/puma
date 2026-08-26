@@ -1,0 +1,8 @@
+[submodule "moose"]
+	path = moose
+	url = https://github.com/hugary1995/moose.git
+	branch = neml2-v3-migration
+[submodule "neml2"]
+	path = neml2
+	url = https://github.com/applied-material-modeling/neml2.git
+	branch = main

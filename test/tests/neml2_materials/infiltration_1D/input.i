@@ -10,71 +10,36 @@ t_ramp = 10
 t_out = ${fparse total_time/2}
 
 # Molar Mass # g mol-1
-M_Si = 28.085
-M_SiC = 40.11
-M_C = 12.011
 
 # denisty # g cm-3
 rho_Si = 2.57 # density at liquid state
-rho_SiC = 3.21
-rho_C = 2.26
 
 # material property
-D_LP = 9.5e-6 # cm2 s-1
-l_c = 0.1 # cm
-h_c = 0.0076 # cm
-K_nucl_growth = 1.2e-15 # cm s-1
-reactivity_upbound = 0.05
-reactivity_lowbound = 0.005
 
-brooks_corey_threshold = 0.5e5 # 0.5e5 #dyn/cm2
-capillary_pressure_power = 10
-phi_L_residual = 0.0
 
-permeability_power = 20.0
 
 # liquid viscosity
 # liquid silicon viscosity in egs -s
-mu_Si = 0.01 # g cm-1 s-1
 
 # solid reference permeability
-kk_ref = 1e-8 # 1e-8
 
 # chemical reaction constant
-k_C = 1.0
-k_SiC = 1.0
 
 # macroscopic property
-D_macro = 0.07 #cm2 s-1
-D_macro_high = 0.4 # cm2 s-1
-D_macro_low = 0.07 #0.003 # cm2 s-1
 
-transition_saturation_front = 0.75
-transition_saturation_back = 0.25
-transition_saturation_back_start = 0.45
 
 # initial condition
-phi_noreact = 0.36
 phi0_SiC = 0.0001
 phi0_C = 0.10
 
 gravity = 980.665
 
 ## Calculations
-D_bar = '${fparse D_LP/(l_c)}'
 
-omega_C = '${fparse M_C/rho_C}'
-omega_Si = '${fparse M_Si/rho_Si}'
-omega_SiC = '${fparse M_SiC/rho_SiC}'
 
-oCm1 = '${fparse 1/omega_C}'
-oSiCm1 = '${fparse 1/omega_SiC}'
 
-om_phinoreact = '${fparse 1-phi_noreact}'
 
-chem_ratio = '${fparse k_SiC/k_C}'
 
-new_scale = '${fparse (transition_saturation_back-transition_saturation_back_start)/2}'
 
 L = 6
 n = 1000
@@ -124,7 +89,7 @@ n = 1000
     family = MONOMIAL
     [AuxKernel]
       type = MaterialRealAux
-      property = non_liquid
+      property = phif_max
       execute_on = 'INITIAL TIMESTEP_END'
     []
   []
@@ -215,48 +180,18 @@ n = 1000
 []
 
 [NEML2]
-  input = 'neml2/neml2_material.i'
-  cli_args = 'kk_L=${kk_ref} permeability_power=${permeability_power} rhof_nu=${fparse rho_Si/mu_Si}
-              rhof2_nu=${fparse rho_Si^2/mu_Si} phif_residual=${phi_L_residual} rhof=${fparse rho_Si}
-              omega_Si=${omega_Si} D=${D_bar} oSiCm1=${oSiCm1} oCm1=${oCm1}
-              chem_ratio=${chem_ratio} mchem_P=${fparse -k_SiC} oP_oL=${fparse omega_SiC/omega_Si}
-              brooks_corey_threshold=${brooks_corey_threshold}
-              K_nucl_growth=${fparse K_nucl_growth/l_c} mhcolc=${fparse -h_c/l_c} omega_SiC=${omega_SiC}
-              Dmacro=${D_macro} delta_Dscale_front=${fparse D_macro_high-D_macro}
-              delta_Dscale_back=${fparse D_macro_low-D_macro}
-              rhof = ${rho_Si} new_scale=${new_scale} transition_saturation_back=${transition_saturation_back}
-              transition_saturation_back_start=${transition_saturation_back_start}
-              transition_saturation_front=${transition_saturation_front}
-              reactivity_upbound=${reactivity_upbound} reactivity_lowbound=${reactivity_lowbound}
-              capillary_pressure_power=${capillary_pressure_power} om_phinoreact=${om_phinoreact}'
+  input = '../../../../neml2_models/aoti/infiltration_1d/model_aoti.i'
   [all]
     model = 'model'
-    verbose = true
     device = 'cpu'
 
-    moose_input_types = 'POSTPROCESSOR POSTPROCESSOR  VARIABLE
-                         MATERIAL      MATERIAL       MATERIAL    MATERIAL'
-    moose_inputs = '     time          time           phif
-                         phip          phip           phis        phis'
-    neml2_inputs = '     forces/t      old_forces/t   forces/phif
-                         state/phip    old_state/phip state/phis  old_state/phis'
-
-    moose_output_types = 'MATERIAL       MATERIAL       MATERIAL   MATERIAL   MATERIAL   MATERIAL
-                          MATERIAL       MATERIAL       MATERIAL   MATERIAL   MATERIAL   MATERIAL'
-    moose_outputs = '     M2             M3             M4         M5         M6         new_solid
-                          non_liquid     poro           perm       phip       phis       Seff'
-    neml2_outputs = '     state/M2       state/M3       state/M4   state/M5   state/M6   state/phi_skeleton
-                          state/phif_max state/poro     state/perm state/phip state/phis state/Seff'
-
-    moose_derivative_types = 'MATERIAL              MATERIAL                MATERIAL
-                              MATERIAL              MATERIAL                MATERIAL
-                              MATERIAL              MATERIAL'
-    moose_derivatives = '     dM6dphif              dM3dphif                dM4dphif
-                              dM5dphif              dphipdphif              dphisdphif
-                              dM2dphif              dphi_new_soliddphif'
-    neml2_derivatives = '     state/M6 forces/phif; state/M3 forces/phif;   state/M4 forces/phif;
-                              state/M5 forces/phif; state/phip forces/phif; state/phis forces/phif;
-                              state/M2 forces/phif; state/phi_skeleton forces/phif'
+    # Inputs/outputs auto-map by name: phif -> VARIABLE; t -> TIME; phip, phis
+    # (current, as MATERIAL) + old values (phip~1, phis~1) are the stateful in/out
+    # pair (same as 2.x state/phip + old_state/phip). Derivatives alias the NEML2
+    # (output input) pair to the MOOSE property name the kernels/BCs read.
+    derivatives = 'M6 phif dM6dphif; M3 phif dM3dphif; M4 phif dM4dphif;
+                   M5 phif dM5dphif; phip phif dphipdphif; phis phif dphisdphif;
+                   M2 phif dM2dphif; new_solid phif dphi_new_soliddphif'
 
     initialize_outputs = '      phip     phis'
     initialize_output_values = 'phi0_SiC phi0_C'

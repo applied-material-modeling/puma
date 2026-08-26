@@ -1,595 +1,484 @@
-import numpy as np
-import subprocess
+# Copyright 2025, UChicago Argonne, LLC
+# All Rights Reserved
+# Software Name: PUMA: Powder Utilization Modeling Application
+# By: UChicago Argonne, LLC
+# OPEN SOURCE LICENSE (MIT)
+#
+# NEML2 v3 driver for the pip_and_lsi/turbine example.
+#
+#   pyrolysis(cycle 1)
+#   -> [ infiltration -> curing -> pyrolysis ] x (pip_cycle_n - 1)
+#   -> LSI infiltration (infiltration_lsi.i / reactive_flow model)
+#   -> LSI solidification
+#
+# Each of the 5 NEML2 models is authored in neml2/<stage>.i with a bare-name
+# constant header; write_neml2_header() injects the real physical constants and
+# compile_model() AOTI-compiles it into neml2/aoti_<stage>/.
+#
+# turbine uses an unstructured 3D mesh (gold/core.msh2) passed to the MOOSE
+# inputs via meshfile (mesh_input.i), rather than a generated grid.
+
 import os
-import time
 import sys
+import time
 import subprocess
 from pathlib import Path
 
-start_time = time.perf_counter()
+HERE = Path(__file__).resolve().parent
+PUMA = HERE.parents[2] / "puma-opt"
+PY_MODELS = HERE.parents[2] / "neml2_models" / "python"
 
-def popen_or_fail(step_name, argv, log_path=None):
-    """Run argv with Popen; exit immediately on non-zero code."""
-    print("\n==> {}".format(step_name), flush=True)
-    if log_path:
-        Path(log_path).parent.mkdir(parents=True, exist_ok=True)
-        with open(log_path, "w") as lf:
-            proc = subprocess.Popen(
-                argv,
-                stdin=subprocess.DEVNULL,
-                stdout=lf,
-                stderr=subprocess.STDOUT,
-                text=True
-            )
-            proc.wait()
-    else:
-        proc = subprocess.Popen(
-            argv,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True
-        )
-        for line in proc.stdout:
-            print(line, end="")
-        proc.wait()
+CORES = 4
+RECOMPILE = False           # force AOTI rebuild even if a stub exists
+RUN_PIP = True              # run the pyrolysis/infiltration/curing cycles
+DEVICES = ["cpu"]
 
-    if proc.returncode != 0:
-        print("ERROR: {} failed with code {}".format(step_name, proc.returncode), file=sys.stderr)
-        sys.exit(proc.returncode)
+STAGES = ["pyrolysis", "curing", "infiltration", "reactive_flow", "solidification"]
 
-########################################## Input ##############################################
-##                                                                                           ##
-## Currently assumed the resin fully filled the open pores gas during polymer infiltration   ##
-## all of the gas managed to escaped, pores production based on the amount of initial binder ##
-## trapped gas production based on the porosity at the begining of the pyrolysis             ##
-##                                                                                           ##
-###############################################################################################
-
-pip_cycle_n = 2  # number of pip cycles
-save_folder = "out_2"
-corenum = 14  # number of cores used for simulation
-puma_run_file = "./../../../puma-opt"
-
-run_pip = True  # run the PIP simulation
-
-# rate of close pore relative to volume of produced gas
-def cp_to_wg_relation(volume_binder, relation=0.001):
-    return relation
-
-
-# portion of open pores as a function of binder consumed
-def op_to_binder_relation(v_nonreactants, relation=0.99):
-    return relation
-
-
-# gas density as a function of temperature and pressure
-def rho_g(T, P):
-    return 13  # kg m-3
-
-
-########################### parts and geometry information ####################################
-# geometry
-reference_mass = 1.0  # reference mass
-
+# ---------------------------------------------------------------------------
+# Geometry / driver options
+# ---------------------------------------------------------------------------
 meshfile = "gold/core.msh2"
+reference_mass = 1.0
+Mref = reference_mass
+pip_cycle_n = 2
+save_folder = "main"
+dt = 5
 
-############################# material and reaction properties ################################
-##           Current properties are for phenolic resin inside SiC praticles                  ##
+# ---------------------------------------------------------------------------
+# Physical constants (turbine PIP resin + LSI silicon values)
+# ---------------------------------------------------------------------------
+R = 8.31446261815324
 
-# universal constant
-R = 8.31446261815324  # JK-1mol-1
-
-# denisty kgm-3
-rho_s = 2260
-rho_b = 1250  # 1.2 and 1.4
-rho_p = 3210
-rho_Si = 2570  # density at liquid state
+# densities [kg m-3]
+rho_s = 2260.0
+rho_b = 1250.0
+rho_p = 3210.0
+rho_g = 13.0
+rho_Si = 2570.0           # liquid Si
 rho_SiC = rho_p
 rho_C = rho_s
+rho_Si_s = 2370.0         # solid Si
 
-# Molar Mass # kg mol-1
+# molar mass [kg mol-1]
 M_Si = 0.028085
 M_SiC = 0.04011
 M_C = 0.012011
 
-# heat capacity Jkg-1K-1
-cp_s = 1592
-cp_b = 1200
-cp_p = 750
+# heat capacity [J kg-1 K-1]
+cp_s = 1592.0
+cp_b = 1200.0
+cp_p = 750.0
 cp_g = 1e-4
-cp_Si = 705
+cp_Si = 705.0
 cp_SiC = cp_p
 cp_C = cp_s
+cp_Si_s = 500.0
 
-# thermal conductivity W/m-1K-1
-k_s = 150
-k_b = 279
-k_p = 380  # 120 and 490
+# thermal conductivity [W m-1 K-1]
+k_s = 150.0
+k_b = 279.0
+k_p = 380.0
 k_g = 1e-4
-kappa_Si = 148 
+kappa_Si = 148.0
 kappa_SiC = k_p
 kappa_C = k_s
+kappa_Si_s = 140.0
 
-# reaction type for pyrolysis
-Ea = 208170  # J mol-1
-A = 0.7e14  # s-1
-hrp = 1.58e6  # e6 J kg-1
-Y = 0.55  # char yield [.]
+# pyrolysis reaction
+Ea = 208170.0
+A = 0.7e14
+hrp = 1.58e6
+Y = 0.55
 order = 7.4496
+pyro_mu = 0.001          # gas / consumed-binder relation
+zeta = 0.99             # open-pore / consumed-binder relation
 
-# reaction type for curing
-Ea_cur = 98000  # J mol-1
-A_cur = 1e12  # s-1
-hrp_cur = 1.58e3  # e6 J kg-1
-Y_cur = 0.25  # char yield [.]
+# curing reaction
+Ea_cur = 98000.0
+A_cur = 1e12
+hrp_cur = 1.58e3
+Y_cur = 0.25
 order_cur = 1.0
+pyro_mu_cur = 0.0
+zeta_cur = 0.95
 
-# porous flow information
-flux_in = 0.005 # volume fraction
+# stress-strain
+E = 400e9
+nu = 0.3
+E_Si = 160e9
+E_C = 400e9
+nu_Si = 0.3
+nu_C = 0.3
+Tref = 300.0
+g = 1e-6                 # thermal expansion coefficient
+
+# resin porous flow (pip infiltration)
+flux_in = 0.005
 flux_out = 0.05
-brooks_corey_threshold = 3e4 #Pa
+brooks_corey_threshold = 3e4
 capillary_pressure_power = 8
 phi_L_residual = 0.0
 permeability_power = 8
-
-mu_b = 10 # liquid viscosity
-kk_b = 2e-5 # solid permeability
+mu_b = 10.0
+kk_b = 2e-5
 hf = 0.0
-D_macro = 0.000001 #m2 s-1 # macroscopic property
-gravity = 0.0# 9.80665
+D_macro = 0.000001
+gravity = 0.0
 
-# porous flow properties - lsi
-mu_Si = 10  # kg m-1s-1
-perm_ref = 2e-5  # permeability
-D_macro_lsi = 2e-5 # cm2 s-1
-D_macro_high = 1e-6 # cm2 s-1
-D_macro_low = 2e-5 #0.003 # cm2 s-1
-
+# LSI porous flow
+mu_Si = 10.0
+perm_ref = 2e-5
+D_macro_lsi = 2e-5
+D_macro_high = 1e-6
+D_macro_low = 2e-5
 transition_saturation_front = 0.75
 transition_saturation_back = 0.45
 transition_saturation_back_start = 0.65
 
-# reactive infiltration properties
-D_LP = 9.5e-6 # cm2 s-1
-l_c = 0.1 # cm
-h_c = 0.0076  # cm
-K_nucl_growth = 1.2e-15  # cm s-1
+# reactive infiltration
+D_LP = 9.5e-6
+l_c = 0.1
+h_c = 0.0076
+K_nucl_growth = 1.2e-15
 k_C = 1.0
 k_SiC = 1.0
 reactivity_upbound = 0.1
 reactivity_lowbound = 0.001
 
-# solidification information
+# solidification
 phif_min = 0.0001
-Ts = 1667  # K
-Tf = Ts + 40  # K
-H_latent = 1787e3  # J/kg
-rho_Si_s = 2370  # density at solid state
-cp_Si_s = 500 # Jkg-1K-1
-kappa_Si_s = 140 # J m-1 s-1 K-1
+Ts = 1667.0
+Tf = Ts + 40.0
+H_latent = 1787e3
 solidification_rate = 0.002
 
-#### stress-strain ####
-E = 400e9
-nu = 0.3
-E_Si = 160e9
-E_C = 400e9 
-nu_Si = 0.3
-nu_C = 0.3
+# convection
+htc = 40.0
 
-# thermal expansion coefficients (degree-1)
-Tref = 300  # K
-g = 1e-6
+# pip heating profiles [hrs for hold/cool, K min-1 for rate]
+T0 = 300.0
+Tmax = 1400.0
+dTdt = 10.0
+t_hold = 2.0
+tcool = 2.0
+T0_cur = 300.0
+Tmax_cur = 420.0
+dTdt_cur = 5.0
+t_hold_cur = 2.0
+tcool_cur = 2.0
+T0_flow = 300.0
+Tmax_flow = 400.0
+dTdt_flow = 10.0
+t_hold_flow = 1.5
+tcool_flow = 1.0
 
-# convection coefficients - Wm-2K
-htc = 40
-
-# heating profiles for pyrolysis
-T0 = 300  # K - starting and cooling temperatures
-Tmax = 1400  # K
-dTdt = 10  # Kmin-1 heating rate
-t_hold = 2.0  # hrs
-tcool = 2.0  # hrs
-
-# heating profiles for curing
-T0_cur = 300  # K - starting and cooling temperatures
-Tmax_cur = 420  # K
-dTdt_cur = 5  # Kmin-1 heating rate
-t_hold_cur = 2.0  # hrs
-tcool_cur = 2.0  # hrs
-
-# heating profiles for porous flow
-T0_flow = 300  # K - starting and cooling temperatures
-Tmax_flow = 400  # K
-dTdt_flow = 10  # Kmin-1 heating rate
-t_hold_flow = 1.5  # hrs
-tcool_flow = 1.0  # hrs
-
-# heating profiles before reactive infiltration
-T0_lsi = Tref  # K - starting and cooling temperatures
-Tmax_lsi = 1720  # K
-dTdt_lsi = 10.0  # Ks-1 heating rate
+# LSI heating / cooling profiles [K s-1]
+T0_lsi = Tref
+Tmax_lsi = 1720.0
+dTdt_lsi = 10.0
 theat_lsi = (Tmax_lsi - T0_lsi) / dTdt_lsi
-tinfiltrate = 3 * 3600  # s
+tinfiltrate = 3 * 3600.0
 flux_in_lsi = 0.005
 flux_out_lsi = 0.005
-t_ramp = theat_lsi + 500
+t_ramp_lsi = theat_lsi + 500.0
+dTdt_cool_lsi = -1.0
+tcool_lsi = (Tmax_lsi - Tref) / (-dTdt_cool_lsi)
+twait_lsi = 8 * 3600.0
 
-# heating profiles during solidification
-dTdt_cool_lsi = -1  # deg per s
-Tfinal_lsi = Tref  # K
-tcool_lsi = (Tmax_lsi - Tfinal_lsi) / (-dTdt_cool_lsi)
-twait_lsi = 8 * 3600
-t_ramp_lsi = theat_lsi + 500
-
-# Simulation parameters
-dt = 5
-
-###############################################################################################
-##                                                                                           ##
-##                                       MAIN                                                ##
-##                                                                                           ##
-###############################################################################################
-
-# remove the save folder if it exists
-# subprocess.run(["rm", "-rf", save_folder])
-
-# generate the initial conditions
-print("\n")
-
-# identify the number of rows in initial_condition.csv file
-initial_condition_file = "initial_condition.csv"
-
-if not os.path.exists(initial_condition_file):
-    raise FileNotFoundError(f"{initial_condition_file} does not exist. Please generate it first.")
-with open(initial_condition_file, "r") as f:
-    num_file_data = sum(1 for line in f)
-
-# num_rows = 100000  # For testing purposes, we set a fixed number of rows
-
-print("Identified {} rows in initial_condition.csv \n".format(num_file_data))
+# derived molar volumes
+omega_C = M_C / rho_C
+omega_Si = M_Si / rho_Si
+omega_SiC = M_SiC / rho_SiC
 
 
-print("\n")
+# ---------------------------------------------------------------------------
+# Per-stage NEML2 header constants (physical values injected into neml2/<stage>.i)
+# ---------------------------------------------------------------------------
+def header_params():
+    pyro = {
+        "A": A, "Ea": Ea, "R": R, "order": order,
+        "mY": -Y, "mu": pyro_mu, "mzeta": -zeta, "Mref": Mref,
+        "rho_s": rho_s, "rho_b": rho_b, "rho_p": rho_p, "rho_g": rho_g,
+        "rho_sm1M": Mref / rho_s, "rho_bm1M": Mref / rho_b,
+        "rho_pm1M": Mref / rho_p, "rho_gm1M": Mref / rho_g,
+        "cp_s": cp_s, "cp_b": cp_b, "cp_p": cp_p,
+        "k_s": k_s, "k_b": k_b, "k_p": k_p,
+        "source_coeff": -rho_s * hrp, "Tref": Tref, "g": g, "E": E,
+        # algebraic mass-fraction coefficients: ws=ws0+cws*wb0*a,
+        # wgcp=wgcp0+cwgcp*wb0*a, phiop=phiop0+cphiop*wb0*a
+        "cws": Y, "cwgcp": pyro_mu * (1.0 - Y), "cphiop": zeta,
+    }
+    cur = dict(pyro)
+    cur.update({
+        "A": A_cur, "Ea": Ea_cur, "order": order_cur,
+        "mY": -Y_cur, "mu": pyro_mu_cur, "mzeta": -zeta_cur,
+        "source_coeff": -rho_s * hrp_cur,
+        "cws": Y_cur, "cwgcp": pyro_mu_cur * (1.0 - Y_cur), "cphiop": zeta_cur,
+    })
+    infil = {
+        "rho_f": rho_b, "Tref": Tref, "therm_expansion": g,
+        "kk_L": kk_b, "permeability_power": permeability_power,
+        "rhof_nu": rho_b / mu_b, "hf_rhof_nu": hf * rho_b / mu_b,
+        "rhof2_nu": rho_b ** 2 / mu_b, "hf_rhof2_nu": hf * rho_b ** 2 / mu_b,
+        "brooks_corey_threshold": brooks_corey_threshold,
+        "capillary_pressure_power": capillary_pressure_power,
+    }
+    reactive = {
+        "initial_product_dummy_thickness": 1e-3,
+        "reactivity_lowbound": reactivity_lowbound,
+        "reactivity_upbound": reactivity_upbound,
+        "D": D_LP / l_c, "oP_oL": omega_SiC / omega_Si,
+        "K_nucl_growth": K_nucl_growth * l_c, "omega_SiC": omega_SiC,
+        "mhcolc": -h_c / l_c, "oSiCm1": 1.0 / omega_SiC, "oCm1": 1.0 / omega_C,
+        "chem_ratio": k_SiC / k_C, "mchem_P": -k_SiC, "omega_Si": omega_Si,
+        "rho_f": rho_Si, "rhof_nu": rho_Si / mu_Si, "rhof2_nu": rho_Si ** 2 / mu_Si,
+        "Dmacro": D_macro_lsi,
+        "delta_Dscale_front": D_macro_high - D_macro_lsi,
+        "delta_Dscale_back": D_macro_low - D_macro_lsi,
+        "new_scale": (transition_saturation_back - transition_saturation_back_start) / 2.0,
+        "transition_saturation_front": transition_saturation_front,
+        "transition_saturation_back": transition_saturation_back,
+        "transition_saturation_back_start": transition_saturation_back_start,
+        "kk_L": perm_ref, "permeability_power": permeability_power,
+        "brooks_corey_threshold": brooks_corey_threshold,
+        "capillary_pressure_power": capillary_pressure_power,
+        "rhocp_Si": rho_Si * cp_Si, "rhocp_SiC": rho_SiC * cp_SiC,
+        "rhocp_C": rho_C * cp_C,
+        "kap_Si": kappa_Si, "kap_SiC": kappa_SiC, "kap_C": kappa_C,
+        "E": E, "therm_expansion": g, "Tref": T0_lsi,
+    }
+    solid = {
+        "cp_rhofl": cp_Si * rho_Si, "cp_rhofs": cp_Si_s * rho_Si_s,
+        "cp_rhos": cp_C * rho_C, "cp_rhop": cp_SiC * rho_SiC,
+        "kap_fl": kappa_Si, "kap_fs": kappa_Si_s, "kap_s": kappa_C, "kap_p": kappa_SiC,
+        "Ts": Ts, "Tl": Tf, "mphi_min": -phif_min,
+        "m_solidification_rate": -solidification_rate,
+        "mOfs_Ofl": -rho_Si / rho_Si_s,
+        "brooks_corey_threshold": brooks_corey_threshold,
+        "capillary_pressure_power": capillary_pressure_power,
+        "kk_L": perm_ref, "permeability_power": permeability_power,
+        "rho_f": rho_Si, "rhof_nu": rho_Si / mu_Si, "rhof2_nu": rho_Si ** 2 / mu_Si,
+        "hf_rhof_onu": H_latent * rho_Si / mu_Si,
+        "hf_rhof2_onu": H_latent * rho_Si ** 2 / mu_Si,
+        "mhf_rhof": -H_latent * rho_Si,
+        "therm_expansion": g, "Tref": Tref,
+        "E": E, "E_fs": E_Si, "E_m": E_C, "nu_fs": nu_Si, "nu_m": nu_C,
+        "delta_Omega": rho_Si / rho_Si_s - 1.0,
+    }
+    return {
+        "pyrolysis": pyro, "curing": cur, "infiltration": infil,
+        "reactive_flow": reactive, "solidification": solid,
+    }
 
-# ------------------------------ EXECUTION ------------------------------
-if run_pip:
-    # ---------------- Pyrolysis cycle 1 ----------------
-    popen_or_fail(
-        "Pyrolysis (cycle 1)",
-        [
-            "mpiexec",
-            "-n",
-            str(corenum),
-            puma_run_file,
-            "-i",
-            "pyrolysis.i",
-            "mesh_input.i",
-            "initial_condition_from_csv.i",
-            "rho_s={:.9f}".format(rho_s),
-            "rho_b={:.9f}".format(rho_b),
-            "rho_g={:.9f}".format(rho_g(1, 1)),
-            "rho_p={:.9f}".format(rho_p),
-            "cp_s={:.9f}".format(cp_s),
-            "cp_b={:.9f}".format(cp_b),
-            "cp_p={:.9f}".format(cp_p),
-            "cp_g={:.9f}".format(cp_p),
-            "k_s={:.9f}".format(k_s),
-            "k_b={:.9f}".format(k_b),
-            "k_p={:.9f}".format(k_p),
-            "k_g={:.9f}".format(k_p),
-            "Ea={:.9f}".format(Ea),
-            "A={:.9f}".format(A),
-            "R={:.9f}".format(R),
-            "hrp={:.9f}".format(hrp),
-            "Y={:.9f}".format(Y),
-            "order={:.9f}".format(order),
-            "E={:.9f}".format(E),
-            "g={:.9f}".format(g),
-            "Tref={:.9f}".format(Tref),
-            "htc={:.9f}".format(htc),
-            "Tmax={:.9f}".format(Tmax),
-            "t_hold={:.9f}".format(t_hold),
-            "tcool={:.9f}".format(tcool),
-            "T0={:.9f}".format(T0),
-            "dTdt={:.9f}".format(dTdt),
-            "pyro_mu={:.9f}".format(cp_to_wg_relation(1)),
-            "zeta={:.9f}".format(op_to_binder_relation(1)),
-            "meshfile={}".format(meshfile),
-            "Mref={:.9f}".format(reference_mass),
-            "num_file_data={}".format(num_file_data),
-            "save_folder={}".format(save_folder),
-            "save_cycle={}".format(str(1)),
-            "save_type={}".format("pyrolysis"),
-        ],
-        log_path="logs/pyrolysis_cycle1.log",
+
+# ---------------------------------------------------------------------------
+# NEML2 header injection + AOTI compilation
+# ---------------------------------------------------------------------------
+def write_neml2_header(path, params):
+    out, in_header = [], True
+    for line in path.read_text().splitlines():
+        if line.lstrip().startswith("["):
+            in_header = False
+        stripped = line.strip()
+        if in_header and stripped and "=" in stripped and not stripped.startswith("#"):
+            key = stripped.split("=", 1)[0].strip()
+            if key in params:
+                comment = "  #" + line.split("#", 1)[1] if "#" in line else ""
+                out.append("{} = {!r}{}".format(key, params[key], comment))
+                continue
+        out.append(line)
+    path.write_text("\n".join(out) + "\n")
+
+
+def compile_model(stage):
+    src = HERE / "neml2" / "{}.i".format(stage)
+    out_dir = "aoti_{}".format(stage)
+    env = dict(os.environ)
+    env["CC"] = "x86_64-conda-linux-gnu-gcc"
+    env["CXX"] = "x86_64-conda-linux-gnu-g++"
+    env["LIBRARY_PATH"] = "/usr/local/cuda/lib64/stubs:" + env.get("LIBRARY_PATH", "")
+    subprocess.run(
+        ["neml2-compile", "--model", "model", src.name,
+         "--dtype", "float64", "--device", *DEVICES,
+         "--output-dir", out_dir, "--load", str(PY_MODELS), "-d", ":"],
+        cwd=str(HERE / "neml2"), env=env, check=True,
     )
 
-    # ---------------- Remaining PIP cycles ----------------
-    for i in range(pip_cycle_n - 1):
-        cycle = i + 1
-        next_cycle = cycle + 1
-        # ----- Infiltration -----
-        popen_or_fail(
-            "Infiltration (cycle {})".format(cycle),
-            [
-                "mpiexec",
-                "-n",
-                str(corenum),
-                puma_run_file,
-                "-i",
-                "infiltration.i",
-                "mesh_input.i",
-                "initial_condition_from_exodus_3.i",
-                "flux_in={:.9f}".format(flux_in),
-                "flux_out={:.9f}".format(flux_out),
-                "rho_b={:.9f}".format(rho_b),
-                "brooks_corey_threshold={:.9f}".format(brooks_corey_threshold),
-                "capillary_pressure_power={:.9f}".format(capillary_pressure_power),
-                "permeability_power={:.9f}".format(permeability_power),
-                "mu_b={:.9f}".format(mu_b),
-                "kk_b={:.9f}".format(kk_b),
-                "hf={:.9f}".format(hf),
-                "k_b={:.9f}".format(k_b),
-                "cp_b={:.9f}".format(cp_b),
-                "D_macro={:.9f}".format(D_macro),
-                "gravity={:.9f}".format(gravity),
-                "E={:.9f}".format(E),
-                "g={:.9f}".format(g),
-                "Tref={:.9f}".format(Tref),
-                "htc={:.9f}".format(htc),
-                "dTdt={:.9f}".format(dTdt_flow),
-                "Tmax={:.9f}".format(Tmax_flow),
-                "t_hold={:.9f}".format(t_hold_flow),
-                "tcool={:.9f}".format(tcool_flow),
-                "T0={:.9f}".format(T0_flow),
-                "meshfile={}".format(meshfile),
-                "save_folder={}".format(save_folder),
-                "save_cycle={}".format(str(cycle)),
-                "load_cycle={}".format(str(cycle)),
-                "save_type={}".format("infiltration"),
-                "load_type={}".format("pyrolysis"),
-            ],
-            log_path="logs/infiltration_cycle{}.log".format(cycle),
-        )
 
-        # ----- Curing -----
-        popen_or_fail(
-            "Curing (cycle {})".format(cycle),
-            [
-                "mpiexec",
-                "-n",
-                str(corenum),
-                puma_run_file,
-                "-i",
-                "curing.i",
-                "mesh_input.i",
-                "initial_condition_from_exodus_1.i",
-                "rho_s={:.9f}".format(rho_s),
-                "rho_b={:.9f}".format(rho_b),
-                "rho_g={:.9f}".format(rho_g(1, 1)),
-                "rho_p={:.9f}".format(rho_p),
-                "cp_s={:.9f}".format(cp_s),
-                "cp_b={:.9f}".format(cp_b),
-                "cp_p={:.9f}".format(cp_p),
-                "cp_g={:.9f}".format(cp_p),
-                "k_s={:.9f}".format(k_s),
-                "k_b={:.9f}".format(k_b),
-                "k_p={:.9f}".format(k_p),
-                "k_g={:.9f}".format(k_p),
-                "Ea={:.9f}".format(Ea_cur),
-                "A={:.9f}".format(A_cur),
-                "R={:.9f}".format(R),
-                "hrp={:.9f}".format(hrp_cur),
-                "Y={:.9f}".format(Y_cur),
-                "order={:.9f}".format(order_cur),
-                "E={:.9f}".format(E),
-                "g={:.9f}".format(g),
-                "Tref={:.9f}".format(Tref),
-                "htc={:.9f}".format(htc),
-                "dTdt={:.9f}".format(dTdt_cur),
-                "Tmax={:.9f}".format(Tmax_cur),
-                "t_hold={:.9f}".format(t_hold_cur),
-                "tcool={:.9f}".format(tcool_cur),
-                "T0={:.9f}".format(T0_cur),
-                "pyro_mu={:.9f}".format(cp_to_wg_relation(1, 0.0)),
-                "zeta={:.9f}".format(op_to_binder_relation(1, 0.95)),
-                "meshfile={}".format(meshfile),
-                "Mref={:.9f}".format(reference_mass),
-                "save_folder={}".format(save_folder),
-                "save_cycle={}".format(str(cycle)),
-                "load_cycle={}".format(str(cycle)),
-                "save_type={}".format("curing"),
-                "load_type={}".format("infiltration"),
-            ],
-            log_path="logs/curing_cycle{}.log".format(cycle),
-        )
-
-        # ----- Next Pyrolysis -----
-        popen_or_fail(
-            "Pyrolysis (cycle {})".format(next_cycle),
-            [
-                "mpiexec",
-                "-n",
-                str(corenum),
-                puma_run_file,
-                "-i",
-                "pyrolysis.i",
-                "mesh_input.i",
-                "initial_condition_from_exodus_2.i",
-                "rho_s={:.9f}".format(rho_s),
-                "rho_b={:.9f}".format(rho_b),
-                "rho_g={:.9f}".format(rho_g(1, 1)),
-                "rho_p={:.9f}".format(rho_p),
-                "cp_s={:.9f}".format(cp_s),
-                "cp_b={:.9f}".format(cp_b),
-                "cp_p={:.9f}".format(cp_p),
-                "cp_g={:.9f}".format(cp_p),
-                "k_s={:.9f}".format(k_s),
-                "k_b={:.9f}".format(k_b),
-                "k_p={:.9f}".format(k_p),
-                "k_g={:.9f}".format(k_p),
-                "Ea={:.9f}".format(Ea),
-                "A={:.9f}".format(A),
-                "R={:.9f}".format(R),
-                "hrp={:.9f}".format(hrp),
-                "Y={:.9f}".format(Y),
-                "order={:.9f}".format(order),
-                "E={:.9f}".format(E),
-                "g={:.9f}".format(g),
-                "Tref={:.9f}".format(Tref),
-                "htc={:.9f}".format(htc),
-                "dTdt={:.9f}".format(dTdt),
-                "Tmax={:.9f}".format(Tmax),
-                "t_hold={:.9f}".format(t_hold),
-                "tcool={:.9f}".format(tcool),
-                "T0={:.9f}".format(T0),
-                "pyro_mu={:.9f}".format(cp_to_wg_relation(1)),
-                "zeta={:.9f}".format(op_to_binder_relation(1)),
-                "meshfile={}".format(meshfile),
-                "Mref={:.9f}".format(reference_mass),
-                "save_folder={}".format(save_folder),
-                "load_cycle={}".format(str(cycle)),
-                "save_cycle={}".format(str(next_cycle)),
-                "save_type={}".format("pyrolysis"),
-                "load_type={}".format("curing"),
-            ],
-            log_path="logs/pyrolysis_cycle{}.log".format(next_cycle),
-        )
-
-# ---------------- LSI: Reactive Infiltration ----------------
-popen_or_fail(
-    "LSI Infiltration",
-    [
-        "mpiexec",
-        "-n",
-        str(corenum),
-        puma_run_file,
-        "-i",
-        "infiltration_lsi.i",
-        "initial_condition_from_exodus_4.i",
-        "mesh_input.i",
-        "dt={:.18f}".format(dt),
-        "total_time={:.18f}".format(t_ramp_lsi + tinfiltrate),
-        "flux_in={:.18f}".format(flux_in_lsi),
-        "flux_out={:.18f}".format(flux_out_lsi),
-        "t_ramp={:.18f}".format(t_ramp_lsi),
-        "t_heat={:.18f}".format(theat_lsi),
-        "dTdt={:.18f}".format(dTdt_lsi),
-        "brooks_corey_threshold={:.18f}".format(brooks_corey_threshold),
-        "capillary_pressure_power={:.18f}".format(capillary_pressure_power),
-        "phi_L_residual={:.18f}".format(phi_L_residual),
-        "permeability_power={:.18f}".format(permeability_power),
-        "mu_Si={:.18f}".format(mu_Si),
-        "perm_ref={:.18f}".format(perm_ref),
-        "hf={:.18f}".format(1),
-        "kappa_Si={:.18f}".format(kappa_Si),
-        "kappa_SiC={:.18f}".format(kappa_SiC),
-        "kappa_C={:.18f}".format(kappa_C),
-        "D_macro={:.18f}".format(D_macro_lsi),
-        "D_macro_high={:.18f}".format(D_macro_high),
-        "D_macro_low={:.18f}".format(D_macro_low),
-        "transition_saturation_front={:.18f}".format(transition_saturation_front),
-        "transition_saturation_back={:.18f}".format(transition_saturation_back),
-        "transition_saturation_back_start={:.18f}".format(transition_saturation_back_start),
-        "reactivity_upbound={:.18f}".format(reactivity_upbound),
-        "reactivity_lowbound={:.18f}".format(reactivity_lowbound),
-        "htc={:.18f}".format(htc),
-        # "phif_min={:.18f}".format(phif_min),
-        "K_nucl_growth={:.18f}".format(K_nucl_growth),
-        "h_c={:.18f}".format(h_c),
-        "E={:.18f}".format(E),
-        "nu={:.18f}".format(nu),
-        "therm_expansion={:.18f}".format(g),
-        "T0={:.18f}".format(T0),
-        "gravity={:.18f}".format(gravity),
-        "D_LP={:.18f}".format(D_LP),
-        "l_c={:.18f}".format(l_c),
-        "M_Si={:.18f}".format(M_Si),
-        "M_SiC={:.18f}".format(M_SiC),
-        "M_C={:.18f}".format(M_C),
-        "rho_Si={:.18f}".format(rho_Si),
-        "rho_SiC={:.18f}".format(rho_SiC),
-        "rho_C={:.18f}".format(rho_C),
-        "cp_Si={:.18f}".format(cp_Si),
-        "cp_SiC={:.18f}".format(cp_SiC),
-        "cp_C={:.18f}".format(cp_C),
-        "k_C={:.18f}".format(k_C),
-        "k_SiC={:.18f}".format(k_SiC),
-        "meshfile={}".format(meshfile),
-        "save_folder={}".format(save_folder),
-        "load_cycle={}".format(str(pip_cycle_n)),
-        "save_cycle={}".format(str(pip_cycle_n)),
-        "save_type={}".format("lsi_infiltration"),
-        "load_type={}".format("pyrolysis"),
-    ],
-    log_path="logs/lsi_infiltration_cycle{}.log".format(pip_cycle_n),
-)
-
-# ---------------- LSI: Solidification ----------------
-popen_or_fail(
-    "LSI Solidification",
-    [
-        "mpiexec",
-        "-n",
-        str(corenum),
-        puma_run_file,
-        "-i",
-        "solidification.i",
-        "mesh_input.i",
-        "initial_condition_from_exodus_5.i",
-        "dt={:.18f}".format(dt),
-        "total_time={:.18f}".format(tcool_lsi + twait_lsi),
-        "t_ramp={:.18f}".format(tcool_lsi),
-        "dTdt={:.18f}".format(dTdt_cool_lsi),
-        "D_macro={:.18f}".format(D_macro_lsi),
-        "brooks_corey_threshold={:.18f}".format(brooks_corey_threshold),
-        "capillary_pressure_power={:.18f}".format(capillary_pressure_power),
-        "permeability_power={:.18f}".format(permeability_power),
-        "mu_Si={:.18f}".format(mu_Si),
-        "kappa_Si={:.18f}".format(kappa_Si),
-        "kappa_Si_s={:.18f}".format(kappa_Si_s),
-        "kappa_SiC={:.18f}".format(kappa_SiC),
-        "kappa_C={:.18f}".format(kappa_C),
-        "htc={:.18f}".format(htc),
-        "E={:.18f}".format(E),
-        "E_Si={:.18f}".format(E_Si),
-        "E_C={:.18f}".format(E_C),
-        "nu_Si={:.18f}".format(nu_Si),
-        "nu_C={:.18f}".format(nu_C),
-        "therm_expansion={:.18f}".format(g),
-        "T0={:.18f}".format(Tmax_lsi),
-        "Tref={:.18f}".format(Tref),
-        "Ts={:.18f}".format(Ts),
-        "Tf={:.18f}".format(Tf),
-        "H_latent={:.18f}".format(H_latent),
-        "M_Si={:.18f}".format(M_Si),
-        "phif_min={:.18f}".format(phif_min),
-        "solidification_rate={:.18f}".format(solidification_rate),
-        "gravity={:.18f}".format(gravity),
-        "rho_Si={:.18f}".format(rho_Si),
-        "rho_Si_s={:.18f}".format(rho_Si_s),
-        "rho_SiC={:.18f}".format(rho_SiC),
-        "rho_C={:.18f}".format(rho_C),
-        "cp_Si={:.18f}".format(cp_Si),
-        "cp_Si_s={:.18f}".format(cp_Si_s),
-        "cp_SiC={:.18f}".format(cp_SiC),
-        "cp_C={:.18f}".format(cp_C),
-        "kk_Si={:.18f}".format(perm_ref),
-        "flux_out={:.18f}".format(flux_out_lsi),
-        "meshfile={}".format(meshfile),
-        "save_folder={}".format(save_folder),
-        "load_cycle={}".format(str(pip_cycle_n)),
-        "save_cycle={}".format(str(pip_cycle_n)),
-        "save_type={}".format("lsi_solidification"),
-        "load_type={}".format("lsi_infiltration"),
-    ],
-    log_path="logs/lsi_solidification_cycle{}.log".format(pip_cycle_n),
-)
-
-# ---------------------------------------------------------------------
+def build_models():
+    params = header_params()
+    for stage in STAGES:
+        src = HERE / "neml2" / "{}.i".format(stage)
+        write_neml2_header(src, params[stage])
+        stub = HERE / "neml2" / "aoti_{}".format(stage) / "model_aoti.i"
+        if RECOMPILE or not stub.exists():
+            print("==> compiling {}".format(stage), flush=True)
+            compile_model(stage)
 
 
-end_time = time.perf_counter()
-print(f"\nTotal time: {end_time - start_time:.2f} seconds")
+# ---------------------------------------------------------------------------
+# MOOSE stage runners
+# ---------------------------------------------------------------------------
+def num_rows(csv):
+    with open(csv) as f:
+        return sum(1 for _ in f)
+
+
+def popen_or_fail(step_name, moose_args, log_path=None):
+    # --allow-unused: several globals are passed for the IC/handoff files and are
+    # not referenced by every stage (the NEML2 constants are now baked into the
+    # compiled AOTI model), so tolerate unused command-line params.
+    argv = ["mpiexec", "-n", str(CORES), str(PUMA), "--allow-unused", "-i"] + moose_args
+    print("\n==> {}\n    {}".format(step_name, " ".join(argv)), flush=True)
+    if log_path:
+        Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(log_path, "w") as lf:
+            proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL,
+                                    stdout=lf, stderr=subprocess.STDOUT, text=True,
+                                    cwd=str(HERE))
+            proc.wait()
+    else:
+        proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, cwd=str(HERE))
+        for line in proc.stdout:
+            print(line, end="")
+        proc.wait()
+    if proc.returncode != 0:
+        print("ERROR: {} failed with code {}".format(step_name, proc.returncode),
+              file=sys.stderr)
+        sys.exit(proc.returncode)
+
+
+def kv(**kw):
+    return ["{}={}".format(k, v) for k, v in kw.items()]
+
+
+def run_pyrolysis(save_cycle, ic_file, load_cycle=None, load_type=None, first=False):
+    args = ["pyrolysis.i", "mesh_input.i", ic_file]
+    args += kv(rho_s=rho_s, rho_b=rho_b, rho_g=rho_g, rho_p=rho_p,
+               cp_s=cp_s, cp_b=cp_b, cp_p=cp_p, cp_g=cp_p,
+               k_s=k_s, k_b=k_b, k_p=k_p, k_g=k_p,
+               Ea=Ea, A=A, R=R, hrp=hrp, Y=Y, order=order,
+               E=E, g=g, Tref=Tref, htc=htc,
+               Tmax=Tmax, t_hold=t_hold, tcool=tcool, T0=T0, dTdt=dTdt,
+               pyro_mu=pyro_mu, zeta=zeta,
+               meshfile=meshfile, Mref=Mref,
+               save_folder=save_folder, save_cycle=save_cycle, save_type="pyrolysis")
+    if first:
+        args += kv(num_file_data=num_rows(HERE / "initial_condition.csv"))
+    else:
+        args += kv(load_cycle=load_cycle, load_type=load_type)
+    popen_or_fail("Pyrolysis (cycle {})".format(save_cycle), args,
+                  log_path="logs/pyrolysis_cycle{}.log".format(save_cycle))
+
+
+def run_infiltration(cycle):
+    args = ["infiltration.i", "mesh_input.i", "initial_condition_from_exodus_3.i"]
+    args += kv(flux_in=flux_in, flux_out=flux_out, rho_b=rho_b,
+               brooks_corey_threshold=brooks_corey_threshold,
+               capillary_pressure_power=capillary_pressure_power,
+               permeability_power=permeability_power,
+               mu_b=mu_b, kk_b=kk_b, hf=hf, k_b=k_b, cp_b=cp_b,
+               D_macro=D_macro, gravity=gravity, E=E, g=g, Tref=Tref, htc=htc,
+               dTdt=dTdt_flow, Tmax=Tmax_flow, t_hold=t_hold_flow,
+               tcool=tcool_flow, T0=T0_flow,
+               meshfile=meshfile,
+               save_folder=save_folder, save_cycle=cycle, load_cycle=cycle,
+               save_type="infiltration", load_type="pyrolysis")
+    popen_or_fail("Infiltration (cycle {})".format(cycle), args,
+                  log_path="logs/infiltration_cycle{}.log".format(cycle))
+
+
+def run_curing(cycle):
+    args = ["curing.i", "mesh_input.i", "initial_condition_from_exodus_1.i"]
+    args += kv(rho_s=rho_s, rho_b=rho_b, rho_g=rho_g, rho_p=rho_p,
+               cp_s=cp_s, cp_b=cp_b, cp_p=cp_p, cp_g=cp_p,
+               k_s=k_s, k_b=k_b, k_p=k_p, k_g=k_p,
+               Ea=Ea_cur, A=A_cur, R=R, hrp=hrp_cur, Y=Y_cur, order=order_cur,
+               E=E, g=g, Tref=Tref, htc=htc,
+               dTdt=dTdt_cur, Tmax=Tmax_cur, t_hold=t_hold_cur,
+               tcool=tcool_cur, T0=T0_cur,
+               pyro_mu=pyro_mu_cur, zeta=zeta_cur,
+               meshfile=meshfile, Mref=Mref,
+               save_folder=save_folder, save_cycle=cycle, load_cycle=cycle,
+               save_type="curing", load_type="infiltration")
+    popen_or_fail("Curing (cycle {})".format(cycle), args,
+                  log_path="logs/curing_cycle{}.log".format(cycle))
+
+
+def run_lsi_infiltration(save_cycle, load_cycle):
+    args = ["infiltration_lsi.i", "initial_condition_from_exodus_4.i", "mesh_input.i"]
+    args += kv(dt=dt, total_time=t_ramp_lsi + tinfiltrate,
+               flux_in=flux_in_lsi, flux_out=flux_out_lsi,
+               t_ramp=t_ramp_lsi, t_heat=theat_lsi, dTdt=dTdt_lsi,
+               brooks_corey_threshold=brooks_corey_threshold,
+               capillary_pressure_power=capillary_pressure_power,
+               phi_L_residual=phi_L_residual, permeability_power=permeability_power,
+               mu_Si=mu_Si, perm_ref=perm_ref, hf=1,
+               kappa_Si=kappa_Si, kappa_SiC=kappa_SiC, kappa_C=kappa_C,
+               D_macro=D_macro_lsi, D_macro_high=D_macro_high, D_macro_low=D_macro_low,
+               transition_saturation_front=transition_saturation_front,
+               transition_saturation_back=transition_saturation_back,
+               transition_saturation_back_start=transition_saturation_back_start,
+               reactivity_upbound=reactivity_upbound,
+               reactivity_lowbound=reactivity_lowbound,
+               K_nucl_growth=K_nucl_growth, h_c=h_c, htc=htc, phif_min=phif_min,
+               E=E, nu=nu, therm_expansion=g, T0=T0, gravity=gravity,
+               D_LP=D_LP, l_c=l_c, M_Si=M_Si, M_SiC=M_SiC, M_C=M_C,
+               rho_Si=rho_Si, rho_SiC=rho_SiC, rho_C=rho_C,
+               cp_Si=cp_Si, cp_SiC=cp_SiC, cp_C=cp_C, k_C=k_C, k_SiC=k_SiC,
+               meshfile=meshfile,
+               save_folder=save_folder, load_cycle=load_cycle, save_cycle=save_cycle,
+               save_type="lsi_infiltration", load_type="pyrolysis")
+    popen_or_fail("LSI Infiltration", args,
+                  log_path="logs/lsi_infiltration_cycle{}.log".format(save_cycle))
+
+
+def run_lsi_solidification(save_cycle, load_cycle):
+    args = ["solidification.i", "mesh_input.i", "initial_condition_from_exodus_5.i"]
+    args += kv(dt=dt, total_time=tcool_lsi + twait_lsi,
+               t_ramp=tcool_lsi, dTdt=dTdt_cool_lsi, D_macro=D_macro_lsi,
+               brooks_corey_threshold=brooks_corey_threshold,
+               capillary_pressure_power=capillary_pressure_power,
+               permeability_power=permeability_power,
+               mu_Si=mu_Si, kappa_Si=kappa_Si, kappa_Si_s=kappa_Si_s,
+               kappa_SiC=kappa_SiC, kappa_C=kappa_C, htc=htc,
+               E=E, E_Si=E_Si, E_C=E_C, nu_Si=nu_Si, nu_C=nu_C,
+               therm_expansion=g, T0=Tmax_lsi, Tref=Tref,
+               Ts=Ts, Tf=Tf, H_latent=H_latent, M_Si=M_Si, phif_min=phif_min,
+               solidification_rate=solidification_rate, gravity=gravity,
+               rho_Si=rho_Si, rho_Si_s=rho_Si_s, rho_SiC=rho_SiC, rho_C=rho_C,
+               cp_Si=cp_Si, cp_Si_s=cp_Si_s, cp_SiC=cp_SiC, cp_C=cp_C,
+               kk_Si=perm_ref, flux_out=flux_out_lsi,
+               meshfile=meshfile,
+               save_folder=save_folder, load_cycle=load_cycle, save_cycle=save_cycle,
+               save_type="lsi_solidification", load_type="lsi_infiltration")
+    popen_or_fail("LSI Solidification", args,
+                  log_path="logs/lsi_solidification_cycle{}.log".format(save_cycle))
+
+
+# ---------------------------------------------------------------------------
+def main():
+    t0 = time.perf_counter()
+    build_models()
+
+    if RUN_PIP:
+        run_pyrolysis(save_cycle=1, ic_file="initial_condition_from_csv.i", first=True)
+        for i in range(pip_cycle_n - 1):
+            cycle = i + 1
+            run_infiltration(cycle)
+            run_curing(cycle)
+            run_pyrolysis(save_cycle=cycle + 1,
+                          ic_file="initial_condition_from_exodus_2.i",
+                          load_cycle=cycle, load_type="curing")
+
+    run_lsi_infiltration(save_cycle=pip_cycle_n, load_cycle=pip_cycle_n)
+    run_lsi_solidification(save_cycle=pip_cycle_n, load_cycle=pip_cycle_n)
+
+    print("\nTotal time: {:.1f} s".format(time.perf_counter() - t0))
+
+
+if __name__ == "__main__":
+    main()

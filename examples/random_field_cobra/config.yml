@@ -1,0 +1,60 @@
+# CoBRA configuration -- CT-based random porosity field for PUMA.
+#
+# This is CoBRA's *native* config format (see the puma-cobra docs); every stage
+# and option is exposed here so it can be tuned directly. Run the whole pipeline
+# with:   cobra config.yml
+# or a single stage with e.g.   cobra config.yml --sample
+#
+# Input:  data/scans.npy  -- (rows, cols, N) porosity field, N top-surface slices
+#         treated as N samples of one 2D field (produced by prepare_ct_scan.py).
+# Output: output/beta/sample_{}.e  -- sampled physical porosity fields (Exodus).
+#         Convert to a PUMA CSV with cobra_to_puma_csv.py.
+
+preprocess:
+  scans:
+    input: "data/scans.npy"
+    physical_resolution: 4.8e-5      # m/px  (12 um native * BLOCK=4)
+  smooth:
+    type: "cobra.utils.smoothing.UniformFilter"
+    kwargs:
+      window_size: 2.4e-4            # m  (~5 px)
+    output: "output/filtered.e"
+  transform:
+    type: "scipy.stats.beta"         # porosity in [0,1] -> Gaussian via beta copula
+    fit:
+      floc: 0
+      fscale: 1
+    output: "output/dist.json"
+  output: "output/preprocessed.e"
+
+kernel_fit:
+  fields:
+    input: "output/preprocessed.e"
+  covariance_estimate:
+    type: "sklearn.covariance.EmpiricalCovariance"
+    cutoff_fraction: 0.5
+  kernel:
+    - type: "cobra.utils.kernels.Exponential"   # x axis
+    - type: "cobra.utils.kernels.Exponential"   # y axis
+  output: "output/kernel.json"
+
+factorize:
+  kernel:
+    input: "output/kernel.json"
+  intervals:                          # output grid, in metres, over the 6 mm field
+    - [0, 6.0e-3, 80]                  # x
+    - [0, 6.0e-3, 80]                  # y
+  mode_cutoff: 1e-4
+  output: "output/basis.e"
+
+sample:
+  input: "output/basis.e"
+  num_samples: 5
+  random_seed: 42
+  output: "output/gaussian/sample_{}.e"
+
+postprocess:
+  input: "output/gaussian/sample_{}.e"
+  transform:
+    input: "output/dist.json"         # inverse beta transform back to porosity
+    output: "output/beta/sample_{}.e"

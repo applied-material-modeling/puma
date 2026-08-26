@@ -10,31 +10,31 @@
 []
 
 [Functions]
-    [wb0]
+    [wb0_f]
         type = PiecewiseConstantFromCSV
         read_prop_user_object = reader_object1
         read_type = 'voronoi'
         column_number = 3
     []
-    [mwb0]
+    [mwb0_f]
         type = PiecewiseConstantFromCSV
         read_prop_user_object = reader_object1
         read_type = 'voronoi'
         column_number = 7
     []
-    [wp0]
+    [wp0_f]
         type = PiecewiseConstantFromCSV
         read_prop_user_object = reader_object1
         read_type = 'voronoi'
         column_number = 4
     []
-    [o_Vref]
+    [o_Vref_f]
         type = PiecewiseConstantFromCSV
         read_prop_user_object = reader_object1
         read_type = 'voronoi'
         column_number = 5
     []
-    [ws0]
+    [ws0_f]
         type = PiecewiseConstantFromCSV
         read_prop_user_object = reader_object1
         read_type = 'voronoi'
@@ -46,27 +46,27 @@
     [init_wb]
         type = GenericFunctionMaterial
         prop_names = 'wb0'
-        prop_values = wb0
+        prop_values = wb0_f
     []
     [init_wp]
         type = GenericFunctionMaterial
         prop_names = 'wp'
-        prop_values = wp0
+        prop_values = wp0_f
     []
     [init_V]
         type = GenericFunctionMaterial
         prop_names = 'o_Vref'
-        prop_values = o_Vref
+        prop_values = o_Vref_f
     []
     [init_mwb0]
         type = GenericFunctionMaterial
         prop_names = 'mwb0'
-        prop_values = mwb0
+        prop_values = mwb0_f
     []
     [init_ws]
         type = GenericFunctionMaterial
         prop_names = 'ws0'
-        prop_values = ws0
+        prop_values = ws0_f
     []
     [init_mat]
         type = GenericConstantMaterial

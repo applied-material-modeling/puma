@@ -1,6 +1,3 @@
-E = 1000
-mu = 0.3
-
 [GlobalParams]
   displacements = 'disp_x disp_y'
   temperature = T
@@ -76,24 +73,19 @@ mu = 0.3
 []
 
 [NEML2]
-  input = 'neml2/neml2_mat.i'
-  cli_args = 'E=${E} mu=${mu}'
+  input = '../../../../../../neml2_models/aoti/solid_mechanics_pressure/model_aoti.i'
   [all]
     model = 'model'
-    verbose = true
     device = 'cpu'
 
-    moose_input_types = 'VARIABLE VARIABLE MATERIAL'
-    moose_inputs = '     T        P        deformation_gradient'
-    neml2_inputs = '     forces/T forces/P forces/F'
+    input_types = 'VARIABLE VARIABLE MATERIAL'
+    inputs      = 'T        P        deformation_gradient'
 
-    moose_output_types = 'MATERIAL MATERIAL MATERIAL'
-    moose_outputs = '     J        pc       pk1_stress'
-    neml2_outputs = '     state/J  state/pc state/pk1'
-
-    moose_derivative_types = 'MATERIAL          MATERIAL            MATERIAL            MATERIAL           MATERIAL'
-    moose_derivatives = '     neml2_dJdF        pk1_jacobian        neml2_dpk1dT        neml2_dpcdT        neml2_dpcdP'
-    neml2_derivatives = '     state/J forces/F; state/pk1 forces/F; state/pk1 forces/T; state/pc forces/T; state/pc forces/P'
+    derivatives = 'J          deformation_gradient neml2_dJdF;
+                   pk2 deformation_gradient dpk2_dF;
+                   neml2_pk1 T                    neml2_dpk1dT;
+                   pc         T                    neml2_dpcdT;
+                   pc         P                    neml2_dpcdP'
   []
 []
 
@@ -106,6 +98,12 @@ mu = 0.3
 # []
 
 [Materials]
+  [stress]
+    type = ComputeLagrangianStressCustomPK2
+    custom_pk2_stress = 'pk2'
+    custom_pk2_jacobian = 'dpk2_dF'
+    large_kinematics = true
+  []
   [zeroR2]
     type = GenericConstantRankTwoTensor
     tensor_name = R20

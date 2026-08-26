@@ -30,8 +30,9 @@ Refer to `examples` folder for usage demonstrations and sample input.
 
 ## Installation Instructions
 
-For the random field generation from images:
-https://github.com/skounouho/puma-cobra.git
+PUMA can seed simulations with a random **porosity** field generated from CT-scan
+imagery — see [Random porosity initial conditions (CoBRA)](#random-porosity-initial-conditions-cobra)
+and the `examples/random_field_cobra/` example.
 
 1. __Python environment__
 
@@ -46,6 +47,14 @@ pip install torch nmhit pyzag==2.0.0 scikit-build-core ninja
 ```
 
 `torch` and `nmhit` are resolved by CMake at NEML2 configure time, so they must be installed first. `neml2` itself is built from the `neml2/` submodule and pip-installed `--no-deps` by the MOOSE build step below, keeping the C++ library and Python `neml2` in lockstep.
+
+For the CT-based random-field workflow, also install **CoBRA** (pip only — it is not vendored as a submodule):
+
+```bash
+pip install git+https://github.com/skounouho/puma-cobra.git
+```
+
+This pulls CoBRA's dependencies (including the `exodusii` fork it uses for its field files); see [Random porosity initial conditions (CoBRA)](#random-porosity-initial-conditions-cobra).
 
 > **pyzag.** The material-calibration examples use pyzag's adjoint, which needs `pyzag` 2.0.0 (from `applied-material-modeling/pyzag`) for its `pyzag.operators` abstraction. The drivers use `neml2.pyzag.NEML2PyzagModel` — construct it, then call `neml2.compile(model)` for JIT.
 
@@ -186,3 +195,67 @@ cd ..
    If `nvcc` is not available on your cluster, omit `cuda` (use `--device cpu`) — the CPU artifacts are all that CPU runs need.
 
 5. __Run on the GPU.__ Point the model at the `cuda` device: in a MOOSE input set `device = cuda` in the `[NEML2]` block, and in the `examples/**/*_scripts.py` drivers set `DEVICES = ["cpu", "cuda"]` (compile) and the run device accordingly. Launch on GPU nodes through the scheduler (e.g. SLURM `--gres=gpu:N`, one MPI rank per GPU).
+
+## Examples
+
+The `examples/` folder contains runnable demonstrations of the processes PUMA models.
+Each is driven by a small Python script (`*_scripts.py`) that compiles the NEML2
+material models it needs (via `neml2-compile` — see [Installation Instructions](#installation-instructions))
+and then launches `puma-opt` under MPI. With the `puma` environment active and PUMA
+built, run one from its own directory:
+
+```bash
+cd examples/pyrolysis/1D
+python pyrolysis_scripts.py        # set CORES at the top of the script for parallelism
+```
+
+| Example | Process demonstrated |
+| --- | --- |
+| `pyrolysis/` (`1D`, `2D`, `3D`) | Binder pyrolysis / debinding — mass loss, gas generation, and shrinkage. |
+| `pyrolysis/material_calibration/` | Calibrating pyrolysis kinetics against TGA experimental data. |
+| `solidification/` (`1D`, `1D_true`, `2D`) | Solidification of an infiltrated liquid phase. |
+| `lsi/` (`1d_grid`, `2d_grid`) | Liquid silicon infiltration (LSI) into a porous preform. |
+| `pip_and_lsi/` (`2D_grid`, `repeated_pyrolysis`, `turbine`) | Chained polymer-infiltration-pyrolysis (PIP) followed by LSI; `repeated_pyrolysis` runs multiple PIP cycles and `turbine` uses a complex meshed geometry. |
+| `porous_flow/` (`none_reactive`, `reactive_infiltration`) | Darcy porous flow, with and without reactive infiltration (includes material calibration). |
+| `random_field_cobra/` | Generate a random porosity initial condition from a CT scan (generation only) — see [below](#random-porosity-initial-conditions-cobra). |
+
+Several examples read a spatially-varying initial condition from a CSV (via
+`initial_condition_from_csv.i`); that CSV can be produced with the CoBRA workflow
+described next.
+
+## Random porosity initial conditions (CoBRA)
+
+PUMA seeds simulations with a spatially-varying **porosity** initial condition,
+supplied as a CSV that MOOSE reads via `PropertyReadFile` (`read_type = 'voronoi'`)
+and `PiecewiseConstantFromCSV`. That CSV can be generated from a real micro-CT scan
+using [CoBRA](https://github.com/skounouho/puma-cobra) (*CT-Based Random-field
+Approximation*), which fits a covariance kernel to CT imagery and draws new
+realizations of the field with a Karhunen–Loève expansion.
+
+CoBRA is installed with pip (it is **not** vendored as a submodule):
+
+```bash
+pip install git+https://github.com/skounouho/puma-cobra.git
+```
+
+The workflow is:
+
+```text
+CT scan → data/scans.npy → cobra config.yml → sampled field (.e) → initial_condition.csv → PUMA
+```
+
+A complete, runnable, **generation-only** example lives in
+[`examples/random_field_cobra/`](examples/random_field_cobra/) (it produces the CSV;
+it does not run a simulation). It ships a small CT-derived field so it runs without
+the raw scan:
+
+```bash
+cd examples/random_field_cobra
+python generate.py --no-prepare          # cobra pipeline → initial_condition.csv (+ preview PNG)
+```
+
+The output `initial_condition.csv` (headerless `x, y, z, phi0_poro`) drops directly
+into PUMA's image-based examples (`examples/pip_and_lsi/2D_grid`, `turbine`,
+`lsi/2d_grid`), whose `initial_condition_from_csv.i` reads it with `nprop = 4`,
+`column_number = 3`; set `num_file_data` to the CSV row count. See the example's
+`README.md` for details and tuning (slice band, threshold, output grid, sample count).
